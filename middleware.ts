@@ -48,8 +48,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect logged-in users away from login/signup pages
-  if ((request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup') && user) {
+  // Redirect logged-in users away from auth pages and homepage
+  const isAuthPage = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup'
+  const isHomepage = request.nextUrl.pathname === '/'
+  
+  if ((isAuthPage || isHomepage) && user) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
