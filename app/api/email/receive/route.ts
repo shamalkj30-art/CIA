@@ -81,16 +81,17 @@ export async function POST(request: NextRequest) {
 
     let analysisText = ''
     let storagePath: string | null = null
-    let fileName: string | null = null
     let fileType: string | null = null
     let fileSize: number | null = null
+    let finalFileName: string | null = null
 
     if (receiptAttachment) {
       // Process attachment
       const attachmentData = receiptAttachment.content || receiptAttachment.data
       const fileBuffer = Buffer.from(attachmentData, 'base64')
       fileType = receiptAttachment.content_type || receiptAttachment.contentType || 'application/octet-stream'
-      fileName = receiptAttachment.filename || receiptAttachment.name || `receipt_${Date.now()}`
+      const fileName = receiptAttachment.filename || receiptAttachment.name || `receipt_${Date.now()}`
+      finalFileName = fileName
       fileSize = fileBuffer.length
 
       // Upload to storage
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
               purchase_id: purchase.id,
               user_id: userId,
               storage_path: storagePath,
-              file_name: fileName,
+              file_name: finalFileName,
               file_type: fileType,
               file_size: fileSize,
             })
@@ -224,12 +225,12 @@ export async function POST(request: NextRequest) {
             .select()
             .single()
 
-          if (purchase && storagePath) {
+          if (purchase && storagePath && finalFileName) {
             await supabase.from('documents').insert({
               purchase_id: purchase.id,
               user_id: userId,
               storage_path: storagePath,
-              file_name: fileName,
+              file_name: finalFileName,
               file_type: fileType,
               file_size: fileSize,
             })
