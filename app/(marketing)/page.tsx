@@ -9,11 +9,14 @@ export default function HomePage() {
   const [demoOpen, setDemoOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-[var(--background)] relative overflow-hidden">
+    <div className="min-h-screen bg-[var(--background)] relative">
       {/* Particles Background */}
       <ParticlesBackground />
+      
+      {/* Content wrapper - above particles */}
+      <div className="relative z-10">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
@@ -499,6 +502,7 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+      </div>{/* End content wrapper */}
 
       {/* Demo Modal */}
       {demoOpen && (
