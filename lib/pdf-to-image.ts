@@ -1,28 +1,17 @@
 // Extract text from PDF for AI analysis
-// Uses multiple methods for best compatibility
 
 export async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
-  // Try unpdf first (better for complex PDFs)
+  // Use unpdf for text extraction
   try {
     const { extractText } = await import('unpdf')
-    const { text } = await extractText(new Uint8Array(pdfBuffer))
-    if (text && text.trim().length > 20) {
-      return text
+    const result = await extractText(new Uint8Array(pdfBuffer))
+    // result.text is an array of strings (one per page)
+    const fullText = Array.isArray(result.text) ? result.text.join('\n') : String(result.text || '')
+    if (fullText && fullText.trim().length > 20) {
+      return fullText
     }
   } catch (e) {
-    console.log('unpdf extraction failed, trying pdf-parse...')
-  }
-
-  // Fallback to pdf-parse
-  try {
-    const pdfParse = (await import('pdf-parse')).default
-    const buffer = Buffer.from(pdfBuffer)
-    const data = await pdfParse(buffer)
-    if (data.text && data.text.trim().length > 20) {
-      return data.text
-    }
-  } catch (e) {
-    console.log('pdf-parse extraction failed')
+    console.log('PDF text extraction failed:', e)
   }
 
   throw new Error('Could not extract text from PDF. This might be a scanned/image-based PDF.')
