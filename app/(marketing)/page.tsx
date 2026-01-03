@@ -3,12 +3,15 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import ThemeToggle from '@/components/ThemeToggle'
+import ParticlesBackground from '@/components/ParticlesBackground'
 
 export default function HomePage() {
   const [demoOpen, setDemoOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-[var(--background)] relative overflow-hidden">
+      {/* Particles Background */}
+      <ParticlesBackground />
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -100,14 +103,14 @@ export default function HomePage() {
           {/* Product Screenshot */}
           <div className="mt-16 relative max-w-4xl mx-auto">
             <div className="card overflow-hidden">
-              {/* Browser Chrome */}
+                {/* Browser Chrome */}
               <div className="flex items-center gap-2 px-4 py-3 bg-[var(--surface-subtle)] border-b border-[var(--border)]">
-                <div className="flex gap-1.5">
+                  <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-[var(--danger)]" />
                   <div className="w-3 h-3 rounded-full bg-[var(--warning)]" />
                   <div className="w-3 h-3 rounded-full bg-[var(--success)]" />
-                </div>
-                <div className="flex-1 mx-4">
+                  </div>
+                  <div className="flex-1 mx-4">
                   <div className="bg-[var(--background)] rounded-md px-3 py-1 text-sm text-[var(--text-muted)] font-mono max-w-xs mx-auto text-center">
                     cyncro.vercel.app/dashboard
                   </div>
@@ -121,11 +124,11 @@ export default function HomePage() {
                   <div className="bg-[var(--surface)] rounded-xl p-4 border border-[var(--border)]">
                     <p className="text-sm text-[var(--text-muted)] mb-1">Items Tracked</p>
                     <p className="text-2xl font-bold text-[var(--text-primary)]">47</p>
-                  </div>
+                    </div>
                   <div className="bg-[var(--surface)] rounded-xl p-4 border border-[var(--border)]">
                     <p className="text-sm text-[var(--text-muted)] mb-1">Protected Value</p>
                     <p className="text-2xl font-bold text-[var(--success)]">$12,450</p>
-                  </div>
+                    </div>
                   <div className="bg-[var(--surface)] rounded-xl p-4 border border-[var(--border)]">
                     <p className="text-sm text-[var(--text-muted)] mb-1">Expiring Soon</p>
                     <p className="text-2xl font-bold text-[var(--warning)]">3</p>
@@ -133,20 +136,20 @@ export default function HomePage() {
                 </div>
 
                 {/* Sample Items */}
-                <div className="space-y-3">
-                  {[
+                  <div className="space-y-3">
+                    {[
                     { name: 'MacBook Pro 14"', merchant: 'Apple Store', days: '289', status: 'active' },
                     { name: 'Sony WH-1000XM5', merchant: 'Best Buy', days: '156', status: 'active' },
                     { name: 'LG OLED TV 55"', merchant: 'Amazon', days: '23', status: 'warning' },
-                  ].map((item, i) => (
+                    ].map((item, i) => (
                     <div key={i} className="flex items-center justify-between p-4 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
-                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-lg bg-[var(--primary-soft)] flex items-center justify-center">
                           <svg className="w-5 h-5 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <div>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div>
                           <p className="font-medium text-[var(--text-primary)]">{item.name}</p>
                           <p className="text-sm text-[var(--text-muted)]">{item.merchant}</p>
                         </div>
@@ -165,10 +168,10 @@ export default function HomePage() {
                       ) : (
                         <span className="badge badge-success">{item.days} days left</span>
                       )}
-                    </div>
-                  ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
             </div>
             
             {/* Callouts */}
