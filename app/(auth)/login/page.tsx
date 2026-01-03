@@ -1,18 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+
+  // Check for error from OAuth callback
+  useEffect(() => {
+    const error = searchParams.get('error')
+    if (error) {
+      setMessage({ type: 'error', text: decodeURIComponent(error) })
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -239,5 +248,20 @@ export default function LoginPage() {
         ← Back to home
       </Link>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-4 border-[var(--border)]" />
+          <div className="absolute inset-0 rounded-full border-4 border-[var(--primary)] border-t-transparent animate-spin" />
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

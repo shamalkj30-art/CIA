@@ -34,10 +34,12 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect /purchases and /upload routes (app routes)
+  // Protect app routes
   const isAppRoute =
     request.nextUrl.pathname.startsWith('/purchases') ||
-    request.nextUrl.pathname.startsWith('/upload')
+    request.nextUrl.pathname.startsWith('/upload') ||
+    request.nextUrl.pathname.startsWith('/dashboard') ||
+    request.nextUrl.pathname.startsWith('/settings')
 
   if (isAppRoute && !user) {
     const url = request.nextUrl.clone()
@@ -46,10 +48,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect logged-in users away from login page
-  if (request.nextUrl.pathname === '/login' && user) {
+  // Redirect logged-in users away from login/signup pages
+  if ((request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup') && user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/purchases'
+    url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
@@ -68,4 +70,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

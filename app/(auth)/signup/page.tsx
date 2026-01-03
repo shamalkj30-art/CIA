@@ -57,9 +57,13 @@ export default function SignUpPage() {
     } else {
       setMessage({ 
         type: 'success', 
-        text: 'Check your email to confirm your account!' 
+        text: '✓ Account created! Check your email to confirm, then sign in.' 
       })
       setLoading(false)
+      // Clear form
+      setEmail('')
+      setPassword('')
+      setConfirmPassword('')
     }
   }
 
