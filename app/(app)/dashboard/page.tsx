@@ -36,8 +36,14 @@ export default function DashboardPage() {
           let activeCount = 0
           let expiringSoonCount = 0
           let expiredCount = 0
+          let totalPriceValue = 0
 
           data.forEach((p) => {
+            // Sum up prices
+            if (p.price) {
+              totalPriceValue += p.price
+            }
+            
             if (p.warranty_expires_at) {
               const expiresAt = new Date(p.warranty_expires_at)
               const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -58,7 +64,7 @@ export default function DashboardPage() {
             activeWarranties: activeCount,
             expiringSoon: expiringSoonCount,
             expired: expiredCount,
-            totalValue: '$' + (data.length * 250).toLocaleString(),
+            totalValue: '$' + totalPriceValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
           })
         }
       } catch (error) {

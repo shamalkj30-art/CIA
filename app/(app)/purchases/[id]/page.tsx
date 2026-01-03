@@ -22,6 +22,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
     item_name: '',
     merchant: '',
     purchase_date: '',
+    price: '',
     warranty_months: '',
     notes: '',
   })
@@ -43,6 +44,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
             item_name: data.item_name,
             merchant: data.merchant || '',
             purchase_date: data.purchase_date,
+            price: data.price?.toString() || '',
             warranty_months: data.warranty_months.toString(),
             notes: data.notes || '',
           })
@@ -106,6 +108,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
           item_name: editForm.item_name,
           merchant: editForm.merchant || null,
           purchase_date: editForm.purchase_date,
+          price: parseFloat(editForm.price) || null,
           warranty_months: parseInt(editForm.warranty_months) || 0,
           notes: editForm.notes || null,
         }),
@@ -284,15 +287,32 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Warranty (months)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editForm.warranty_months}
-                    onChange={(e) => setEditForm({ ...editForm, warranty_months: e.target.value })}
-                    className="input"
-                  />
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Price</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editForm.price}
+                        onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                        className="input pl-8"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Warranty (months)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editForm.warranty_months}
+                      onChange={(e) => setEditForm({ ...editForm, warranty_months: e.target.value })}
+                      className="input"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Notes</label>
@@ -355,6 +375,12 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                 <div>
                   <dt className="text-sm text-[var(--text-muted)] mb-1">Merchant</dt>
                   <dd className="font-medium text-[var(--text-primary)]">{purchase.merchant || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-[var(--text-muted)] mb-1">Price</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">
+                    {purchase.price ? `$${purchase.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-sm text-[var(--text-muted)] mb-1">Purchase Date</dt>

@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { item_name, merchant, purchase_date, warranty_months, document } = body
+    const { item_name, merchant, purchase_date, price, warranty_months, category, notes, document } = body
 
     // Validate required fields
     if (!item_name || !purchase_date) {
@@ -61,7 +61,10 @@ export async function POST(request: NextRequest) {
         item_name,
         merchant: merchant || null,
         purchase_date,
+        price: price || null,
         warranty_months: warranty_months || 0,
+        category: category || null,
+        notes: notes || null,
       })
       .select()
       .single()
@@ -102,4 +105,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 }
-

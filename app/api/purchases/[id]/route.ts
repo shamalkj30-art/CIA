@@ -43,7 +43,7 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { item_name, merchant, purchase_date, warranty_months, notes, category } = body
+    const { item_name, merchant, purchase_date, price, warranty_months, notes, category } = body
 
     // Calculate warranty expiration
     let warranty_expires_at = null
@@ -60,6 +60,7 @@ export async function PATCH(
     if (item_name !== undefined) updateData.item_name = item_name
     if (merchant !== undefined) updateData.merchant = merchant
     if (purchase_date !== undefined) updateData.purchase_date = purchase_date
+    if (price !== undefined) updateData.price = price
     if (warranty_months !== undefined) {
       updateData.warranty_months = warranty_months
       updateData.warranty_expires_at = warranty_expires_at

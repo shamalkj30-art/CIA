@@ -13,13 +13,22 @@ CREATE TABLE IF NOT EXISTS purchases (
   item_name TEXT NOT NULL,
   merchant TEXT,
   purchase_date DATE NOT NULL,
+  price DECIMAL(10,2),
   warranty_months INTEGER DEFAULT 0,
   warranty_expires_at DATE GENERATED ALWAYS AS (
     purchase_date + (warranty_months * INTERVAL '1 month')
   ) STORED,
+  category TEXT,
+  notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: Add price, category, notes columns if they don't exist
+-- Run this if you already have the purchases table
+-- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
+-- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS category TEXT;
+-- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- Index for user queries
 CREATE INDEX IF NOT EXISTS purchases_user_id_idx ON purchases(user_id);

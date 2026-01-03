@@ -16,6 +16,8 @@ interface ReceiptAnalysis {
   merchant?: string
   purchase_date?: string
   warranty_months?: number
+  total_amount?: number
+  currency?: string
   confidence: 'high' | 'medium' | 'low'
   missing_fields: string[]
 }
@@ -47,6 +49,7 @@ export default function UploadPage() {
   const [itemName, setItemName] = useState('')
   const [merchant, setMerchant] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
+  const [price, setPrice] = useState('')
   const [warrantyMonths, setWarrantyMonths] = useState('')
   const [category, setCategory] = useState('electronics')
   const [notes, setNotes] = useState('')
@@ -112,6 +115,7 @@ export default function UploadPage() {
         if (analysis.item_name) setItemName(analysis.item_name)
         if (analysis.merchant) setMerchant(analysis.merchant)
         if (analysis.purchase_date) setPurchaseDate(analysis.purchase_date)
+        if (analysis.total_amount) setPrice(analysis.total_amount.toString())
         if (analysis.warranty_months) setWarrantyMonths(analysis.warranty_months.toString())
         setStep(2)
       }
@@ -161,6 +165,7 @@ export default function UploadPage() {
           item_name: itemName,
           merchant: merchant || null,
           purchase_date: purchaseDate,
+          price: parseFloat(price) || null,
           warranty_months: parseInt(warrantyMonths) || 0,
           category,
           notes: notes || null,
@@ -191,6 +196,7 @@ export default function UploadPage() {
     setItemName('')
     setMerchant('')
     setPurchaseDate('')
+    setPrice('')
     setWarrantyMonths('')
     setNotes('')
     setStep(1)
@@ -438,6 +444,26 @@ export default function UploadPage() {
                   onChange={(e) => setPurchaseDate(e.target.value)}
                   className="input"
                   required
+                />
+              </div>
+            </div>
+
+            {/* Price Row */}
+            <div>
+              <label htmlFor="price" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                Price
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                <input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="input pl-8"
                 />
               </div>
             </div>
