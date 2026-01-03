@@ -13,9 +13,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Default to dark theme for our cosmic design
-  const [theme, setTheme] = useState<Theme>('dark')
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark')
+  // Default to light theme for receipt paper aesthetic
+  const [theme, setTheme] = useState<Theme>('light')
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -23,9 +23,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem('theme') as Theme | null
     if (stored) {
       setTheme(stored)
+      // Also set resolved theme immediately
+      if (stored === 'system') {
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        setResolvedTheme(systemDark ? 'dark' : 'light')
+      } else {
+        setResolvedTheme(stored === 'dark' ? 'dark' : 'light')
+      }
     } else {
-      // If no stored preference, default to dark
-      setTheme('dark')
+      // If no stored preference, default to light
+      setTheme('light')
+      setResolvedTheme('light')
     }
   }, [])
 
@@ -64,12 +72,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme, mounted])
 
-  // Apply dark class immediately to prevent flash
-  useEffect(() => {
-    if (!mounted) {
-      document.documentElement.classList.add('dark')
-    }
-  }, [mounted])
+  // Theme is applied via inline script in layout.tsx to prevent flash
 
   if (!mounted) {
     return <>{children}</>
