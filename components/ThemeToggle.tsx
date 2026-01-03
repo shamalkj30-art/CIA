@@ -2,24 +2,23 @@
 
 import { useState, useEffect } from 'react'
 
-function useThemeSafe() {
+export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
-  const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('dark')
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark')
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('light')
 
   useEffect(() => {
     setMounted(true)
     const stored = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null
-    if (stored) setThemeState(stored)
-    
-    const isDark = document.documentElement.classList.contains('dark')
-    setResolvedTheme(isDark ? 'dark' : 'light')
+    if (stored) {
+      setThemeState(stored)
+      applyTheme(stored)
+    } else {
+      // Default to light theme for receipt-paper aesthetic
+      applyTheme('light')
+    }
   }, [])
 
-  const setTheme = (newTheme: 'light' | 'dark' | 'system') => {
-    setThemeState(newTheme)
-    localStorage.setItem('theme', newTheme)
-    
+  const applyTheme = (newTheme: 'light' | 'dark' | 'system') => {
     const root = document.documentElement
     const actualTheme = newTheme === 'system' 
       ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -27,33 +26,37 @@ function useThemeSafe() {
     
     root.classList.remove('light', 'dark')
     root.classList.add(actualTheme)
-    setResolvedTheme(actualTheme)
   }
 
-  return { theme, setTheme, resolvedTheme, mounted }
-}
+  const setTheme = (newTheme: 'light' | 'dark' | 'system') => {
+    setThemeState(newTheme)
+    localStorage.setItem('theme', newTheme)
+    applyTheme(newTheme)
+  }
 
-export default function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme, mounted } = useThemeSafe()
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
+    setTheme(nextTheme)
+  }
 
   if (!mounted) {
     return <div className="w-10 h-10" />
   }
 
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+
   return (
     <button
-      onClick={() => {
-        const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
-        setTheme(nextTheme)
-      }}
-      className="relative w-10 h-10 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/50 flex items-center justify-center transition-all hover:scale-105 group"
+      onClick={toggleTheme}
+      className="relative w-10 h-10 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)] flex items-center justify-center transition-all"
       title={`Theme: ${theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}`}
+      aria-label={`Current theme: ${theme}. Click to change.`}
     >
       <div className="relative w-5 h-5">
         {/* Sun Icon */}
         <svg
           className={`absolute inset-0 w-5 h-5 text-[var(--warning)] transition-all duration-300 ${
-            resolvedTheme === 'dark' ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
+            isDark ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
           }`}
           fill="none"
           stroke="currentColor"
@@ -69,7 +72,7 @@ export default function ThemeToggle() {
         {/* Moon Icon */}
         <svg
           className={`absolute inset-0 w-5 h-5 text-[var(--primary)] transition-all duration-300 ${
-            resolvedTheme === 'dark' ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
+            isDark ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
           }`}
           fill="none"
           stroke="currentColor"
@@ -86,8 +89,8 @@ export default function ThemeToggle() {
       
       {/* System indicator */}
       {theme === 'system' && (
-        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--accent)] border-2 border-[var(--background)] flex items-center justify-center">
-          <span className="text-[6px] text-white font-bold">A</span>
+        <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[var(--primary)] border-2 border-[var(--background)] flex items-center justify-center">
+          <span className="text-[7px] text-white font-bold">A</span>
         </span>
       )}
     </button>

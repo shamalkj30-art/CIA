@@ -150,12 +150,12 @@ export default function PurchasesPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--foreground)]">Purchases</h1>
-          <p className="text-[var(--muted-light)] mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">Purchases</h1>
+          <p className="text-[var(--text-secondary)] mt-1">
             {purchases.length} {purchases.length === 1 ? 'item' : 'items'} tracked
           </p>
         </div>
@@ -170,18 +170,18 @@ export default function PurchasesPage() {
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add Purchase
+            Add
           </Link>
         </div>
       </div>
 
       {/* Filters & Search */}
-      <div className="glass p-4 mb-6">
+      <div className="card p-4 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
           <div className="flex-1 relative">
             <svg
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted)]"
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -199,8 +199,8 @@ export default function PurchasesPage() {
 
           {/* Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[var(--muted)] hidden sm:block">Filter:</span>
-            <div className="flex gap-1 bg-[var(--background-secondary)] rounded-xl p-1">
+            <span className="text-sm text-[var(--text-muted)] hidden sm:block">Filter:</span>
+            <div className="flex gap-1 bg-[var(--surface-subtle)] rounded-lg p-1">
               {[
                 { value: 'all', label: 'All' },
                 { value: 'active', label: 'Active' },
@@ -210,10 +210,10 @@ export default function PurchasesPage() {
                 <button
                   key={option.value}
                   onClick={() => setFilterBy(option.value as FilterOption)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                     filterBy === option.value
                       ? 'bg-[var(--primary)] text-white shadow-sm'
-                      : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {option.label}
@@ -224,7 +224,7 @@ export default function PurchasesPage() {
 
           {/* Sort */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[var(--muted)] hidden sm:block">Sort:</span>
+            <span className="text-sm text-[var(--text-muted)] hidden sm:block">Sort:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -241,8 +241,8 @@ export default function PurchasesPage() {
 
       {/* Bulk Actions */}
       {selectedIds.size > 0 && (
-        <div className="glass p-4 mb-4 flex items-center justify-between animate-fade-in">
-          <span className="text-sm text-[var(--foreground)]">
+        <div className="card p-4 mb-4 flex items-center justify-between">
+          <span className="text-sm text-[var(--text-primary)]">
             {selectedIds.size} {selectedIds.size === 1 ? 'item' : 'items'} selected
           </span>
           <div className="flex gap-2">
@@ -253,7 +253,7 @@ export default function PurchasesPage() {
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              Delete Selected
+              Delete
             </button>
           </div>
         </div>
@@ -261,25 +261,22 @@ export default function PurchasesPage() {
 
       {/* Loading State */}
       {loading ? (
-        <div className="glass text-center py-16">
-          <div className="relative w-12 h-12 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-[var(--border)]" />
-            <div className="absolute inset-0 rounded-full border-4 border-[var(--primary)] border-t-transparent animate-spin" />
-          </div>
-          <p className="text-[var(--muted)]">Loading purchases...</p>
+        <div className="card text-center py-16">
+          <div className="w-10 h-10 mx-auto mb-4 border-2 border-[var(--border)] border-t-[var(--primary)] rounded-full animate-spin" />
+          <p className="text-[var(--text-muted)]">Loading purchases...</p>
         </div>
       ) : filteredPurchases.length === 0 ? (
         /* Empty State */
-        <div className="glass text-center py-16">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center">
-            <svg className="w-10 h-10 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="card text-center py-16">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center">
+            <svg className="w-8 h-8 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-[var(--foreground)] mb-2">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
             {debouncedSearch || filterBy !== 'all' ? 'No results found' : 'No purchases yet'}
           </h3>
-          <p className="text-[var(--muted-light)] mb-6 max-w-sm mx-auto">
+          <p className="text-[var(--text-muted)] mb-6 max-w-sm mx-auto">
             {debouncedSearch
               ? `No purchases match "${debouncedSearch}"`
               : filterBy !== 'all'
@@ -296,36 +293,39 @@ export default function PurchasesPage() {
           )}
         </div>
       ) : (
-        /* Purchases Grid */
+        /* Purchases List */
         <div className="space-y-3">
           {/* Select All Header */}
           <div className="flex items-center gap-3 px-2">
             <button
               onClick={selectAll}
-              className="w-5 h-5 rounded border-2 border-[var(--border)] hover:border-[var(--primary)] flex items-center justify-center transition-colors"
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                selectedIds.size === filteredPurchases.length && filteredPurchases.length > 0
+                  ? 'bg-[var(--primary)] border-[var(--primary)]'
+                  : 'border-[var(--border)] hover:border-[var(--primary)]'
+              }`}
             >
               {selectedIds.size === filteredPurchases.length && filteredPurchases.length > 0 && (
-                <svg className="w-3 h-3 text-[var(--primary)]" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               )}
             </button>
-            <span className="text-sm text-[var(--muted)]">
+            <span className="text-sm text-[var(--text-muted)]">
               {filteredPurchases.length} {filteredPurchases.length === 1 ? 'result' : 'results'}
             </span>
           </div>
 
-          {filteredPurchases.map((purchase, index) => {
+          {filteredPurchases.map((purchase) => {
             const warrantyStatus = getWarrantyStatus(purchase.warranty_expires_at)
             const isSelected = selectedIds.has(purchase.id)
             
             return (
               <div
                 key={purchase.id}
-                className={`glass p-4 transition-all animate-fade-in group ${
-                  isSelected ? 'ring-2 ring-[var(--primary)] bg-[var(--primary)]/5' : ''
+                className={`card p-4 transition-all group ${
+                  isSelected ? 'ring-2 ring-[var(--primary)] bg-[var(--primary-soft)]' : ''
                 }`}
-                style={{ animationDelay: `${index * 0.05}s`, opacity: 0 }}
               >
                 <div className="flex items-center gap-4">
                   {/* Checkbox */}
@@ -345,8 +345,8 @@ export default function PurchasesPage() {
                   </button>
 
                   {/* Icon */}
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-11 h-11 rounded-lg bg-[var(--primary-soft)] flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
@@ -354,22 +354,22 @@ export default function PurchasesPage() {
                   {/* Content */}
                   <Link href={`/purchases/${purchase.id}`} className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-[var(--foreground)] truncate group-hover:text-[var(--primary)] transition-colors">
+                      <h3 className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--primary)] transition-colors">
                         {purchase.item_name}
                       </h3>
                       {purchase.documents.length > 0 && (
-                        <span className="flex-shrink-0 w-5 h-5 rounded bg-[var(--primary)]/15 flex items-center justify-center">
+                        <span className="flex-shrink-0 w-5 h-5 rounded bg-[var(--primary-soft)] flex items-center justify-center">
                           <svg className="w-3 h-3 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                           </svg>
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                    <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                       {purchase.merchant && (
                         <>
                           <span>{purchase.merchant}</span>
-                          <span className="text-[var(--border)]">•</span>
+                          <span>•</span>
                         </>
                       )}
                       <span>{formatDate(purchase.purchase_date)}</span>
@@ -390,7 +390,7 @@ export default function PurchasesPage() {
                   )}
 
                   {/* Arrow */}
-                  <Link href={`/purchases/${purchase.id}`} className="p-2 text-[var(--muted)] hover:text-[var(--primary)] transition-colors">
+                  <Link href={`/purchases/${purchase.id}`} className="p-2 text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>

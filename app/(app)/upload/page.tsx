@@ -203,11 +203,11 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="max-w-2xl mx-auto">
       {/* Back Link */}
       <Link
         href="/purchases"
-        className="inline-flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] mb-6 transition-colors"
+        className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--primary)] mb-6 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -217,17 +217,17 @@ export default function UploadPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[var(--foreground)] mb-2">Add Purchase</h1>
-        <p className="text-[var(--muted-light)]">
+        <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-1">Add Purchase</h1>
+        <p className="text-[var(--text-secondary)]">
           Upload a receipt and let AI extract the details
         </p>
       </div>
 
       {/* Progress Steps */}
       <div className="flex items-center gap-4 mb-8">
-        <div className={`flex items-center gap-2 ${step >= 1 ? 'text-[var(--primary)]' : 'text-[var(--muted)]'}`}>
+        <div className={`flex items-center gap-2 ${step >= 1 ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'}`}>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
-            step >= 1 ? 'bg-[var(--primary)] text-white' : 'bg-[var(--card)] border border-[var(--border)]'
+            step >= 1 ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface)] border border-[var(--border)]'
           }`}>
             1
           </div>
@@ -236,9 +236,9 @@ export default function UploadPage() {
         <div className="flex-1 h-0.5 bg-[var(--border)]">
           <div className={`h-full bg-[var(--primary)] transition-all ${step >= 2 ? 'w-full' : 'w-0'}`} />
         </div>
-        <div className={`flex items-center gap-2 ${step >= 2 ? 'text-[var(--primary)]' : 'text-[var(--muted)]'}`}>
+        <div className={`flex items-center gap-2 ${step >= 2 ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'}`}>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
-            step >= 2 ? 'bg-[var(--primary)] text-white' : 'bg-[var(--card)] border border-[var(--border)]'
+            step >= 2 ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface)] border border-[var(--border)]'
           }`}>
             2
           </div>
@@ -248,7 +248,7 @@ export default function UploadPage() {
 
       {/* Error Display */}
       {error && (
-        <div className="mb-6 p-4 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error)] text-sm flex items-start gap-3">
+        <div className="mb-6 p-4 rounded-xl bg-[var(--danger-soft)] border border-[var(--danger)]/20 text-[var(--danger)] text-sm flex items-start gap-3">
           <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -260,10 +260,8 @@ export default function UploadPage() {
       {analysisResult && (
         <div className={`mb-6 p-4 rounded-xl text-sm flex items-start gap-3 ${
           analysisResult.confidence === 'high'
-            ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20'
-            : analysisResult.confidence === 'medium'
-            ? 'bg-[var(--warning)]/10 text-[var(--warning)] border border-[var(--warning)]/20'
-            : 'bg-orange-500/10 text-orange-500 border border-orange-500/20'
+            ? 'bg-[var(--success-soft)] text-[var(--success)] border border-[var(--success)]/20'
+            : 'bg-[var(--warning-soft)] text-[var(--warning)] border border-[var(--warning)]/20'
         }`}>
           <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -272,9 +270,7 @@ export default function UploadPage() {
             <p className="font-medium">
               {analysisResult.confidence === 'high'
                 ? '✓ AI extracted information with high confidence'
-                : analysisResult.confidence === 'medium'
-                ? '⚠ Please verify the extracted information'
-                : '⚠ Some fields need manual review'}
+                : '⚠ Please verify the extracted information'}
             </p>
             {analysisResult.missing_fields.length > 0 && (
               <p className="text-xs mt-1 opacity-75">
@@ -287,14 +283,14 @@ export default function UploadPage() {
 
       {/* Step 1: Upload */}
       {step === 1 && (
-        <div className="glass p-6 animate-fade-in">
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Upload Receipt</h2>
+        <div className="card">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Upload Receipt</h2>
           
           {!uploadedFile ? (
             <div
-              className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all ${
+              className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all ${
                 dragActive
-                  ? 'border-[var(--primary)] bg-[var(--primary)]/5'
+                  ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
                   : 'border-[var(--border)] hover:border-[var(--primary)]/50'
               } ${uploading ? 'pointer-events-none opacity-50' : ''}`}
               onDragEnter={handleDrag}
@@ -309,43 +305,40 @@ export default function UploadPage() {
                 onChange={handleFileChange}
                 disabled={uploading}
               />
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--accent)]/20 flex items-center justify-center">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center">
                 {uploading ? (
-                  <div className="relative w-8 h-8">
-                    <div className="absolute inset-0 rounded-full border-4 border-[var(--border)]" />
-                    <div className="absolute inset-0 rounded-full border-4 border-[var(--primary)] border-t-transparent animate-spin" />
-                  </div>
+                  <div className="w-6 h-6 border-2 border-[var(--border)] border-t-[var(--primary)] rounded-full animate-spin" />
                 ) : (
-                  <svg className="w-8 h-8 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                 )}
               </div>
-              <p className="text-[var(--foreground)] font-medium mb-1">
+              <p className="text-[var(--text-primary)] font-medium mb-1">
                 {uploading ? 'Uploading...' : 'Drop your receipt here, or click to browse'}
               </p>
-              <p className="text-sm text-[var(--muted)]">
+              <p className="text-sm text-[var(--text-muted)]">
                 Supports JPG, PNG, PDF, HEIC, WebP up to 10MB
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/20">
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--success-soft)] border border-[var(--success)]/20">
                 <div className="w-12 h-12 rounded-xl bg-[var(--success)]/20 flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-[var(--success)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[var(--foreground)] truncate">{uploadedFile.file_name}</p>
-                  <p className="text-sm text-[var(--muted)]">
+                  <p className="font-medium text-[var(--text-primary)] truncate">{uploadedFile.file_name}</p>
+                  <p className="text-sm text-[var(--text-muted)]">
                     {formatFileSize(uploadedFile.file_size)} • {uploadedFile.file_type.split('/')[1]?.toUpperCase() || 'FILE'}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={clearUpload}
-                  className="text-[var(--muted)] hover:text-[var(--error)] p-2 transition-colors"
+                  className="text-[var(--text-muted)] hover:text-[var(--danger)] p-2 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -362,11 +355,8 @@ export default function UploadPage() {
                 >
                   {analyzing ? (
                     <>
-                      <div className="relative w-5 h-5 mr-2">
-                        <div className="absolute inset-0 rounded-full border-2 border-white/30" />
-                        <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      </div>
-                      Analyzing with AI...
+                      <div className="w-5 h-5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Analyzing...
                     </>
                   ) : (
                     <>
@@ -382,7 +372,7 @@ export default function UploadPage() {
                   onClick={() => setStep(2)}
                   className="btn btn-secondary py-3"
                 >
-                  Skip AI
+                  Skip
                 </button>
               </div>
             </div>
@@ -392,9 +382,9 @@ export default function UploadPage() {
 
       {/* Step 2: Details Form */}
       {step === 2 && (
-        <div className="glass p-6 animate-fade-in">
+        <div className="card">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-[var(--foreground)]">Purchase Details</h2>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Purchase Details</h2>
             <button
               type="button"
               onClick={() => setStep(1)}
@@ -404,11 +394,11 @@ export default function UploadPage() {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Item Name */}
             <div>
-              <label htmlFor="itemName" className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                Item Name <span className="text-[var(--error)]">*</span>
+              <label htmlFor="itemName" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                Item Name <span className="text-[var(--danger)]">*</span>
               </label>
               <input
                 id="itemName"
@@ -424,7 +414,7 @@ export default function UploadPage() {
             {/* Merchant & Date Row */}
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="merchant" className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                <label htmlFor="merchant" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Merchant
                 </label>
                 <input
@@ -438,8 +428,8 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label htmlFor="purchaseDate" className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                  Purchase Date <span className="text-[var(--error)]">*</span>
+                <label htmlFor="purchaseDate" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                  Purchase Date <span className="text-[var(--danger)]">*</span>
                 </label>
                 <input
                   id="purchaseDate"
@@ -455,7 +445,7 @@ export default function UploadPage() {
             {/* Warranty & Category Row */}
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="warrantyMonths" className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                <label htmlFor="warrantyMonths" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Warranty Period
                 </label>
                 <div className="relative">
@@ -468,14 +458,14 @@ export default function UploadPage() {
                     placeholder="12"
                     className="input pr-16"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">
                     months
                   </span>
                 </div>
               </div>
 
               <div>
-                <label htmlFor="category" className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                <label htmlFor="category" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Category
                 </label>
                 <select
@@ -495,8 +485,8 @@ export default function UploadPage() {
 
             {/* Notes */}
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                Notes <span className="text-[var(--muted)]">(optional)</span>
+              <label htmlFor="notes" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                Notes <span className="text-[var(--text-muted)]">(optional)</span>
               </label>
               <textarea
                 id="notes"
@@ -509,19 +499,16 @@ export default function UploadPage() {
             </div>
 
             {/* Submit */}
-            <div className="pt-4">
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={!itemName || !purchaseDate || submitting}
-                className="btn btn-primary w-full py-4 text-base"
+                className="btn btn-primary w-full py-3"
               >
                 {submitting ? (
                   <>
-                    <div className="relative w-5 h-5 mr-2">
-                      <div className="absolute inset-0 rounded-full border-2 border-white/30" />
-                      <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    </div>
-                    Creating Purchase...
+                    <div className="w-5 h-5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Creating...
                   </>
                 ) : (
                   <>

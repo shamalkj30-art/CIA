@@ -10,36 +10,36 @@ export default async function SettingsPage() {
   const forwardingEmail = `receipts@${emailDomain}`
   
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[var(--foreground)] mb-2">Settings</h1>
-        <p className="text-[var(--muted-light)]">
+        <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-1">Settings</h1>
+        <p className="text-[var(--text-secondary)]">
           Manage your account and preferences
         </p>
       </div>
 
       <div className="space-y-6">
         {/* Account Info */}
-        <div className="glass p-6">
+        <div className="card">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white text-2xl font-bold">
+            <div className="w-14 h-14 rounded-xl bg-[var(--primary)] flex items-center justify-center text-white text-xl font-bold">
               {user?.email?.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-[var(--foreground)]">Account</h2>
-              <p className="text-[var(--muted)]">{user?.email}</p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Account</h2>
+              <p className="text-[var(--text-muted)]">{user?.email}</p>
             </div>
           </div>
           
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-              <p className="text-sm text-[var(--muted)] mb-1">Account ID</p>
-              <p className="font-mono text-sm text-[var(--foreground)] truncate">{user?.id}</p>
+            <div className="p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)]">
+              <p className="text-sm text-[var(--text-muted)] mb-1">Account ID</p>
+              <p className="font-mono text-sm text-[var(--text-primary)] truncate">{user?.id}</p>
             </div>
-            <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-              <p className="text-sm text-[var(--muted)] mb-1">Member Since</p>
-              <p className="font-medium text-[var(--foreground)]">
+            <div className="p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)]">
+              <p className="text-sm text-[var(--text-muted)] mb-1">Member Since</p>
+              <p className="font-medium text-[var(--text-primary)]">
                 {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', {
                   month: 'long',
                   year: 'numeric'
@@ -50,39 +50,39 @@ export default async function SettingsPage() {
         </div>
 
         {/* Email Forwarding */}
-        <div className="glass p-6">
+        <div className="card">
           <div className="flex items-start gap-4 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white flex-shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] flex-shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-[var(--foreground)]">Email Forwarding</h2>
-              <p className="text-sm text-[var(--muted)]">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Email Forwarding</h2>
+              <p className="text-sm text-[var(--text-muted)]">
                 Forward receipt emails to automatically add them to your account.
               </p>
             </div>
           </div>
           
-          <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] mb-4">
-            <label className="text-sm text-[var(--muted)] block mb-2">Forward receipts to</label>
+          <div className="p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] mb-4">
+            <label className="text-sm text-[var(--text-muted)] block mb-2">Forward receipts to</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 font-mono text-lg bg-[var(--primary)]/10 text-[var(--primary)] px-4 py-3 rounded-xl truncate">
+              <code className="flex-1 font-mono text-base bg-[var(--primary-soft)] text-[var(--primary)] px-4 py-3 rounded-lg truncate">
                 {forwardingEmail}
               </code>
               <CopyButton text={forwardingEmail} />
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 mb-6">
-            <p className="text-sm text-[var(--foreground)]">
-              <strong>Important:</strong> Forward emails from <span className="text-[var(--primary)]">{user?.email}</span> — we identify your account by your sender email.
+          <div className="p-4 rounded-xl bg-[var(--warning-soft)] border border-[var(--warning)]/20 mb-6">
+            <p className="text-sm text-[var(--text-primary)]">
+              <strong>Important:</strong> Forward emails from <span className="text-[var(--primary)] font-medium">{user?.email}</span> — we identify your account by your sender email.
             </p>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">How it works</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">How it works</h3>
             <div className="space-y-3">
               {[
                 { step: 1, text: `Forward any receipt email to ${forwardingEmail}` },
@@ -91,66 +91,53 @@ export default async function SettingsPage() {
                 { step: 4, text: 'Purchase appears in your account' },
               ].map((item) => (
                 <div key={item.step} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/15 flex items-center justify-center text-[var(--primary)] font-semibold text-sm">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] font-semibold text-sm">
                     {item.step}
                   </div>
-                  <span className="text-sm text-[var(--muted-light)]">{item.text}</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{item.text}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="glass p-6">
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Quick Actions</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Link
-              href="/upload"
-              className="flex items-center gap-3 p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] hover:border-[var(--primary)]/50 transition-colors"
-            >
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-[var(--foreground)]">Add Purchase</p>
-                <p className="text-xs text-[var(--muted)]">Upload a new receipt</p>
-              </div>
+        {/* Quick Links */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Quick Links</h2>
+          <div className="space-y-2">
+            <Link href="/dashboard" className="flex items-center gap-3 p-3 rounded-lg hover:bg-[var(--surface-subtle)] transition-colors">
+              <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span className="text-[var(--text-primary)]">Dashboard</span>
             </Link>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-3 p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] hover:border-[var(--primary)]/50 transition-colors"
-            >
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-[var(--foreground)]">Dashboard</p>
-                <p className="text-xs text-[var(--muted)]">View your stats</p>
-              </div>
+            <Link href="/purchases" className="flex items-center gap-3 p-3 rounded-lg hover:bg-[var(--surface-subtle)] transition-colors">
+              <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-[var(--text-primary)]">All Purchases</span>
+            </Link>
+            <Link href="/upload" className="flex items-center gap-3 p-3 rounded-lg hover:bg-[var(--surface-subtle)] transition-colors">
+              <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span className="text-[var(--text-primary)]">Upload Receipt</span>
             </Link>
           </div>
         </div>
 
-        {/* Pro Tips */}
-        <div className="glass p-6">
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Pro Tips</h2>
-          <div className="space-y-3">
-            {[
-              { icon: '⚡', text: 'Set up an email filter to auto-forward receipts' },
-              { icon: '🛒', text: 'Works with Amazon, Apple, and most online store receipts' },
-              { icon: '📎', text: 'Attachments (images, PDFs) are also processed' },
-              { icon: '🤖', text: 'AI automatically extracts item details and warranty info' },
-            ].map((tip, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--background-secondary)]">
-                <span className="text-xl">{tip.icon}</span>
-                <span className="text-sm text-[var(--muted-light)]">{tip.text}</span>
-              </div>
-            ))}
+        {/* Support */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Support</h2>
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
+            Need help? Contact us at{' '}
+            <a href="mailto:support@cyncro.app" className="text-[var(--primary)] hover:underline">
+              support@cyncro.app
+            </a>
+          </p>
+          <div className="flex gap-4 text-sm">
+            <Link href="/privacy" className="text-[var(--primary)] hover:underline">Privacy Policy</Link>
+            <Link href="/terms" className="text-[var(--primary)] hover:underline">Terms of Service</Link>
           </div>
         </div>
       </div>

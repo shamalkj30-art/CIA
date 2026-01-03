@@ -184,13 +184,10 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
 
   if (loading) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-[var(--border)]" />
-            <div className="absolute inset-0 rounded-full border-4 border-[var(--primary)] border-t-transparent animate-spin" />
-          </div>
-          <p className="text-[var(--muted)]">Loading purchase...</p>
+          <div className="w-12 h-12 mx-auto mb-4 border-2 border-[var(--border)] border-t-[var(--primary)] rounded-full animate-spin" />
+          <p className="text-[var(--text-muted)]">Loading purchase...</p>
         </div>
       </div>
     )
@@ -203,11 +200,11 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
   const isPdf = receiptInfo?.file_type === 'application/pdf'
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto">
       {/* Back Link */}
       <Link
         href="/purchases"
-        className="inline-flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] mb-6 transition-colors"
+        className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--primary)] mb-6 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -216,14 +213,14 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
       </Link>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--foreground)] mb-2">{purchase.item_name}</h1>
-          <div className="flex items-center gap-3 text-[var(--muted)]">
+          <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-1">{purchase.item_name}</h1>
+          <div className="flex items-center gap-2 text-[var(--text-muted)]">
             {purchase.merchant && (
               <>
                 <span>{purchase.merchant}</span>
-                <span className="text-[var(--border)]">•</span>
+                <span>•</span>
               </>
             )}
             <span>{formatDate(purchase.purchase_date)}</span>
@@ -241,7 +238,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="btn btn-ghost text-[var(--error)]"
+            className="btn btn-ghost text-[var(--danger)]"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -255,11 +252,11 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
         <div className="lg:col-span-2 space-y-6">
           {/* Edit Mode */}
           {isEditing ? (
-            <div className="glass p-6 animate-fade-in">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Edit Purchase</h2>
+            <div className="card">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Edit Purchase</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">Item Name</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Item Name</label>
                   <input
                     type="text"
                     value={editForm.item_name}
@@ -269,7 +266,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--foreground)] mb-2">Merchant</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Merchant</label>
                     <input
                       type="text"
                       value={editForm.merchant}
@@ -278,7 +275,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--foreground)] mb-2">Purchase Date</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Purchase Date</label>
                     <input
                       type="date"
                       value={editForm.purchase_date}
@@ -288,7 +285,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">Warranty (months)</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Warranty (months)</label>
                   <input
                     type="number"
                     min="0"
@@ -298,7 +295,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">Notes</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Notes</label>
                   <textarea
                     value={editForm.notes}
                     onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
@@ -318,21 +315,21 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
             </div>
           ) : (
             /* View Mode */
-            <div className="glass p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-6">Purchase Details</h2>
+            <div className="card">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Purchase Details</h2>
               
               {/* Warranty Status Banner */}
               {purchase.warranty_months > 0 && (
                 <div className={`mb-6 p-4 rounded-xl flex items-center gap-4 ${
                   warrantyStatus.expired
-                    ? 'bg-[var(--error)]/10 border border-[var(--error)]/20'
+                    ? 'bg-[var(--danger-soft)] border border-[var(--danger)]/20'
                     : warrantyStatus.daysLeft <= 30
-                    ? 'bg-[var(--warning)]/10 border border-[var(--warning)]/20'
-                    : 'bg-[var(--success)]/10 border border-[var(--success)]/20'
+                    ? 'bg-[var(--warning-soft)] border border-[var(--warning)]/20'
+                    : 'bg-[var(--success-soft)] border border-[var(--success)]/20'
                 }`}>
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                     warrantyStatus.expired
-                      ? 'bg-[var(--error)]/20 text-[var(--error)]'
+                      ? 'bg-[var(--danger)]/20 text-[var(--danger)]'
                       : warrantyStatus.daysLeft <= 30
                       ? 'bg-[var(--warning)]/20 text-[var(--warning)]'
                       : 'bg-[var(--success)]/20 text-[var(--success)]'
@@ -343,11 +340,11 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                   </div>
                   <div>
                     <p className={`font-semibold ${
-                      warrantyStatus.expired ? 'text-[var(--error)]' : warrantyStatus.daysLeft <= 30 ? 'text-[var(--warning)]' : 'text-[var(--success)]'
+                      warrantyStatus.expired ? 'text-[var(--danger)]' : warrantyStatus.daysLeft <= 30 ? 'text-[var(--warning)]' : 'text-[var(--success)]'
                     }`}>
                       {warrantyStatus.label}
                     </p>
-                    <p className="text-sm text-[var(--muted)]">
+                    <p className="text-sm text-[var(--text-muted)]">
                       {purchase.warranty_months} month warranty • Expires {formatDate(purchase.warranty_expires_at!)}
                     </p>
                   </div>
@@ -356,43 +353,43 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
 
               <dl className="grid sm:grid-cols-2 gap-6">
                 <div>
-                  <dt className="text-sm text-[var(--muted)] mb-1">Merchant</dt>
-                  <dd className="font-medium text-[var(--foreground)]">{purchase.merchant || '—'}</dd>
+                  <dt className="text-sm text-[var(--text-muted)] mb-1">Merchant</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">{purchase.merchant || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm text-[var(--muted)] mb-1">Purchase Date</dt>
-                  <dd className="font-medium text-[var(--foreground)]">{formatDate(purchase.purchase_date)}</dd>
+                  <dt className="text-sm text-[var(--text-muted)] mb-1">Purchase Date</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">{formatDate(purchase.purchase_date)}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm text-[var(--muted)] mb-1">Warranty Period</dt>
-                  <dd className="font-medium text-[var(--foreground)]">
+                  <dt className="text-sm text-[var(--text-muted)] mb-1">Warranty Period</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">
                     {purchase.warranty_months > 0 ? `${purchase.warranty_months} months` : 'No warranty'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-sm text-[var(--muted)] mb-1">Added</dt>
-                  <dd className="font-medium text-[var(--foreground)]">{formatDate(purchase.created_at)}</dd>
+                  <dt className="text-sm text-[var(--text-muted)] mb-1">Added</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">{formatDate(purchase.created_at)}</dd>
                 </div>
               </dl>
             </div>
           )}
 
           {/* Claim Packet Section */}
-          <div className="glass p-6">
-            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">Claim Packet</h2>
-            <p className="text-sm text-[var(--muted)] mb-4">
+          <div className="card">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Claim Packet</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-4">
               Generate a professional PDF document for warranty claims.
             </p>
 
             {packetError && (
-              <div className="mb-4 p-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error)] text-sm">
+              <div className="mb-4 p-3 rounded-xl bg-[var(--danger-soft)] border border-[var(--danger)]/20 text-[var(--danger)] text-sm">
                 {packetError}
               </div>
             )}
 
             {packetUrl ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/20">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--success-soft)] border border-[var(--success)]/20">
                   <svg className="w-5 h-5 text-[var(--success)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -430,10 +427,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
               >
                 {generatingPacket ? (
                   <>
-                    <div className="relative w-5 h-5 mr-2">
-                      <div className="absolute inset-0 rounded-full border-2 border-white/30" />
-                      <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    </div>
+                    <div className="w-5 h-5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Generating...
                   </>
                 ) : (
@@ -450,13 +444,13 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* Sidebar - Receipt */}
-        <div className="glass p-6">
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Receipt</h2>
+        <div className="card">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Receipt</h2>
           
           {!hasReceipt ? (
-            <div className="text-center py-8 text-[var(--muted)]">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--background-secondary)] flex items-center justify-center">
-                <svg className="w-8 h-8 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="text-center py-8 text-[var(--text-muted)]">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-[var(--surface-subtle)] flex items-center justify-center">
+                <svg className="w-7 h-7 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
@@ -470,15 +464,12 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
             >
               {loadingReceipt ? (
                 <>
-                  <div className="relative w-8 h-8">
-                    <div className="absolute inset-0 rounded-full border-4 border-[var(--border)]" />
-                    <div className="absolute inset-0 rounded-full border-4 border-[var(--primary)] border-t-transparent animate-spin" />
-                  </div>
-                  <span className="text-[var(--muted)]">Loading...</span>
+                  <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--primary)] rounded-full animate-spin" />
+                  <span className="text-[var(--text-muted)]">Loading...</span>
                 </>
               ) : (
                 <>
-                  <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/20 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center">
                     <svg className="w-6 h-6 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -491,15 +482,15 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
           ) : (
             <div className="space-y-4">
               {isPdf ? (
-                <div className="text-center py-8 bg-[var(--background-secondary)] rounded-xl">
-                  <svg className="w-16 h-16 mx-auto mb-3 text-[var(--error)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="text-center py-8 bg-[var(--surface-subtle)] rounded-xl">
+                  <svg className="w-14 h-14 mx-auto mb-3 text-[var(--danger)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
-                  <p className="font-medium text-[var(--foreground)] mb-1">{receiptInfo?.file_name}</p>
-                  <p className="text-sm text-[var(--muted)]">PDF document</p>
+                  <p className="font-medium text-[var(--text-primary)] mb-1">{receiptInfo?.file_name}</p>
+                  <p className="text-sm text-[var(--text-muted)]">PDF document</p>
                 </div>
               ) : (
-                <div className="rounded-xl overflow-hidden bg-[var(--background-secondary)]">
+                <div className="rounded-xl overflow-hidden bg-[var(--surface-subtle)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={receiptUrl}
@@ -527,15 +518,15 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="glass max-w-md w-full p-6 animate-scale-in">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--error)]/20 flex items-center justify-center">
-              <svg className="w-6 h-6 text-[var(--error)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="card max-w-md w-full p-6">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--danger-soft)] flex items-center justify-center">
+              <svg className="w-6 h-6 text-[var(--danger)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-[var(--foreground)] text-center mb-2">Delete Purchase</h3>
-            <p className="text-[var(--muted)] text-center mb-6">
+            <h3 className="text-xl font-semibold text-[var(--text-primary)] text-center mb-2">Delete Purchase</h3>
+            <p className="text-[var(--text-muted)] text-center mb-6">
               Are you sure you want to delete &quot;{purchase.item_name}&quot;? This action cannot be undone.
             </p>
             <div className="flex gap-3">
