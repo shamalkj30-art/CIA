@@ -2,19 +2,25 @@
 
 import { useState, useEffect } from 'react'
 
+// Self-contained theme toggle that works independently
+// Uses localStorage directly to avoid hydration issues
 export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
   const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('light')
+  const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    // Read from localStorage
     const stored = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null
-    if (stored) {
-      setThemeState(stored)
-      applyTheme(stored)
+    const currentTheme = stored || 'light'
+    setThemeState(currentTheme)
+    
+    // Calculate if dark
+    if (currentTheme === 'system') {
+      setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
     } else {
-      // Default to light theme for receipt-paper aesthetic
-      applyTheme('light')
+      setIsDark(currentTheme === 'dark')
     }
   }, [])
 
@@ -26,6 +32,7 @@ export default function ThemeToggle() {
     
     root.classList.remove('light', 'dark')
     root.classList.add(actualTheme)
+    setIsDark(actualTheme === 'dark')
   }
 
   const setTheme = (newTheme: 'light' | 'dark' | 'system') => {
@@ -43,12 +50,10 @@ export default function ThemeToggle() {
     return <div className="w-10 h-10" />
   }
 
-  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-
   return (
     <button
       onClick={toggleTheme}
-      className="relative w-10 h-10 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)] flex items-center justify-center transition-all"
+      className="relative w-10 h-10 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)]/50 flex items-center justify-center transition-all hover:scale-105"
       title={`Theme: ${theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}`}
       aria-label={`Current theme: ${theme}. Click to change.`}
     >
