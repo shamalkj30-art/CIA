@@ -15,20 +15,12 @@ CREATE TABLE IF NOT EXISTS purchases (
   purchase_date DATE NOT NULL,
   price DECIMAL(10,2),
   warranty_months INTEGER DEFAULT 0,
-  warranty_expires_at DATE GENERATED ALWAYS AS (
-    purchase_date + (warranty_months * INTERVAL '1 month')
-  ) STORED,
+  warranty_expires_at DATE,
   category TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Migration: Add price, category, notes columns if they don't exist
--- Run this if you already have the purchases table
--- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
--- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS category TEXT;
--- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- Index for user queries
 CREATE INDEX IF NOT EXISTS purchases_user_id_idx ON purchases(user_id);
@@ -135,6 +127,27 @@ CREATE TRIGGER update_purchases_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
+-- MIGRATION: Run this if you have an existing database
+-- ============================================
+-- If warranty_expires_at is a generated column, you need to drop and recreate it:
+-- 
+-- Step 1: Drop the generated column
+-- ALTER TABLE purchases DROP COLUMN IF EXISTS warranty_expires_at;
+-- 
+-- Step 2: Add it as a regular column
+-- ALTER TABLE purchases ADD COLUMN warranty_expires_at DATE;
+-- 
+-- Step 3: Add the other new columns
+-- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
+-- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS category TEXT;
+-- ALTER TABLE purchases ADD COLUMN IF NOT EXISTS notes TEXT;
+-- 
+-- Step 4: Backfill warranty_expires_at for existing records (optional)
+-- UPDATE purchases 
+-- SET warranty_expires_at = purchase_date + (warranty_months * INTERVAL '1 month')::interval
+-- WHERE warranty_months > 0 AND warranty_expires_at IS NULL;
+
+-- ============================================
 -- STORAGE POLICIES
 -- ============================================
 -- Run these in the Supabase Dashboard > Storage > Policies
@@ -156,4 +169,3 @@ CREATE TRIGGER update_purchases_updated_at
 
 -- 3. DELETE policy (name: "Users can delete own receipts"):
 --    (bucket_id = 'receipts' AND auth.uid()::text = (storage.foldername(name))[1])
-

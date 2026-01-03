@@ -50,7 +50,7 @@ export default function UploadPage() {
   const [merchant, setMerchant] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
   const [price, setPrice] = useState('')
-  const [warrantyMonths, setWarrantyMonths] = useState('')
+  const [warrantyExpiresAt, setWarrantyExpiresAt] = useState('')
   const [category, setCategory] = useState('electronics')
   const [notes, setNotes] = useState('')
 
@@ -116,7 +116,12 @@ export default function UploadPage() {
         if (analysis.merchant) setMerchant(analysis.merchant)
         if (analysis.purchase_date) setPurchaseDate(analysis.purchase_date)
         if (analysis.total_amount) setPrice(analysis.total_amount.toString())
-        if (analysis.warranty_months) setWarrantyMonths(analysis.warranty_months.toString())
+        // If warranty months is extracted, calculate expiry date from purchase date
+        if (analysis.warranty_months && analysis.purchase_date) {
+          const purchDate = new Date(analysis.purchase_date)
+          purchDate.setMonth(purchDate.getMonth() + analysis.warranty_months)
+          setWarrantyExpiresAt(purchDate.toISOString().split('T')[0])
+        }
         setStep(2)
       }
     } catch (err) {
@@ -166,7 +171,7 @@ export default function UploadPage() {
           merchant: merchant || null,
           purchase_date: purchaseDate,
           price: parseFloat(price) || null,
-          warranty_months: parseInt(warrantyMonths) || 0,
+          warranty_expires_at: warrantyExpiresAt || null,
           category,
           notes: notes || null,
           document: uploadedFile,
@@ -197,7 +202,8 @@ export default function UploadPage() {
     setMerchant('')
     setPurchaseDate('')
     setPrice('')
-    setWarrantyMonths('')
+    setWarrantyExpiresAt('')
+    setCategory('electronics')
     setNotes('')
     setStep(1)
   }
@@ -471,23 +477,17 @@ export default function UploadPage() {
             {/* Warranty & Category Row */}
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="warrantyMonths" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Warranty Period
+                <label htmlFor="warrantyExpiresAt" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                  Warranty Expires
                 </label>
-                <div className="relative">
-                  <input
-                    id="warrantyMonths"
-                    type="number"
-                    min="0"
-                    value={warrantyMonths}
-                    onChange={(e) => setWarrantyMonths(e.target.value)}
-                    placeholder="12"
-                    className="input pr-16"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">
-                    months
-                  </span>
-                </div>
+                <input
+                  id="warrantyExpiresAt"
+                  type="date"
+                  value={warrantyExpiresAt}
+                  onChange={(e) => setWarrantyExpiresAt(e.target.value)}
+                  className="input"
+                  min={purchaseDate || undefined}
+                />
               </div>
 
               <div>

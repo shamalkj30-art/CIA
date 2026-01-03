@@ -23,7 +23,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
     merchant: '',
     purchase_date: '',
     price: '',
-    warranty_months: '',
+    warranty_expires_at: '',
     notes: '',
   })
   const [saving, setSaving] = useState(false)
@@ -45,7 +45,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
             merchant: data.merchant || '',
             purchase_date: data.purchase_date,
             price: data.price?.toString() || '',
-            warranty_months: data.warranty_months.toString(),
+            warranty_expires_at: data.warranty_expires_at || '',
             notes: data.notes || '',
           })
         } else {
@@ -109,7 +109,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
           merchant: editForm.merchant || null,
           purchase_date: editForm.purchase_date,
           price: parseFloat(editForm.price) || null,
-          warranty_months: parseInt(editForm.warranty_months) || 0,
+          warranty_expires_at: editForm.warranty_expires_at || null,
           notes: editForm.notes || null,
         }),
       })
@@ -304,13 +304,13 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Warranty (months)</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Warranty Expires</label>
                     <input
-                      type="number"
-                      min="0"
-                      value={editForm.warranty_months}
-                      onChange={(e) => setEditForm({ ...editForm, warranty_months: e.target.value })}
+                      type="date"
+                      value={editForm.warranty_expires_at}
+                      onChange={(e) => setEditForm({ ...editForm, warranty_expires_at: e.target.value })}
                       className="input"
+                      min={editForm.purchase_date || undefined}
                     />
                   </div>
                 </div>

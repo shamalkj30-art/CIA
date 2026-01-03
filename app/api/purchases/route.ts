@@ -32,6 +32,14 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(data)
 }
 
+// Helper function to calculate months between two dates
+function calculateMonthsBetween(startDate: string, endDate: string): number {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+  return Math.max(0, months)
+}
+
 // POST /api/purchases - Create a new purchase
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -43,7 +51,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { item_name, merchant, purchase_date, price, warranty_months, category, notes, document } = body
+    const { item_name, merchant, purchase_date, price, warranty_expires_at, category, notes, document } = body
 
     // Validate required fields
     if (!item_name || !purchase_date) {
@@ -51,6 +59,12 @@ export async function POST(request: NextRequest) {
         { error: 'Item name and purchase date are required' },
         { status: 400 }
       )
+    }
+
+    // Calculate warranty_months from dates if warranty_expires_at is provided
+    let warranty_months = 0
+    if (warranty_expires_at && purchase_date) {
+      warranty_months = calculateMonthsBetween(purchase_date, warranty_expires_at)
     }
 
     // Insert purchase
@@ -62,7 +76,8 @@ export async function POST(request: NextRequest) {
         merchant: merchant || null,
         purchase_date,
         price: price || null,
-        warranty_months: warranty_months || 0,
+        warranty_months,
+        warranty_expires_at: warranty_expires_at || null,
         category: category || null,
         notes: notes || null,
       })

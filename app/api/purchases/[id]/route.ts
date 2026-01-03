@@ -43,15 +43,7 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { item_name, merchant, purchase_date, price, warranty_months, notes, category } = body
-
-    // Calculate warranty expiration
-    let warranty_expires_at = null
-    if (purchase_date && warranty_months && warranty_months > 0) {
-      const purchaseDate = new Date(purchase_date)
-      purchaseDate.setMonth(purchaseDate.getMonth() + warranty_months)
-      warranty_expires_at = purchaseDate.toISOString().split('T')[0]
-    }
+    const { item_name, merchant, purchase_date, price, warranty_expires_at, notes, category } = body
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -61,9 +53,17 @@ export async function PATCH(
     if (merchant !== undefined) updateData.merchant = merchant
     if (purchase_date !== undefined) updateData.purchase_date = purchase_date
     if (price !== undefined) updateData.price = price
-    if (warranty_months !== undefined) {
-      updateData.warranty_months = warranty_months
+    if (warranty_expires_at !== undefined) {
       updateData.warranty_expires_at = warranty_expires_at
+      // Calculate warranty_months from dates
+      if (warranty_expires_at && purchase_date) {
+        const start = new Date(purchase_date)
+        const end = new Date(warranty_expires_at)
+        const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+        updateData.warranty_months = Math.max(0, months)
+      } else {
+        updateData.warranty_months = 0
+      }
     }
     if (notes !== undefined) updateData.notes = notes
     if (category !== undefined) updateData.category = category
