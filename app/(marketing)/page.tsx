@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function HomePage() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
@@ -62,6 +63,7 @@ export default function HomePage() {
 
               {/* Nav */}
               <div className="flex items-center gap-3">
+                <ThemeToggle />
                 <Link 
                   href="/login" 
                   className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import ThemeToggle from '@/components/ThemeToggle'
 
 function LoginForm() {
   const router = useRouter()
@@ -120,13 +121,16 @@ function LoginForm() {
         />
       </div>
 
-      {/* Logo */}
-      <Link href="/" className="relative flex items-center gap-3 mb-8 animate-fade-in">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center shadow-lg glow-primary">
-          <span className="text-white font-bold text-xl">C</span>
-        </div>
-        <span className="text-2xl font-bold text-[var(--foreground)]">Cyncro</span>
-      </Link>
+      {/* Logo and Theme Toggle */}
+      <div className="relative w-full max-w-md flex items-center justify-between mb-8 animate-fade-in">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center shadow-lg glow-primary">
+            <span className="text-white font-bold text-xl">C</span>
+          </div>
+          <span className="text-2xl font-bold text-[var(--foreground)]">Cyncro</span>
+        </Link>
+        <ThemeToggle />
+      </div>
 
       {/* Login Card */}
       <div className="relative glass w-full max-w-md p-8 animate-fade-in-up" style={{ animationDelay: '0.1s', opacity: 0 }}>
