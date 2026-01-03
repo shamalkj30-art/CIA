@@ -28,6 +28,63 @@ export async function GET(
   return NextResponse.json(data)
 }
 
+// PATCH /api/purchases/[id] - Update purchase
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const supabase = await createClient()
+  
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await request.json()
+    const { item_name, merchant, purchase_date, warranty_months, notes, category } = body
+
+    // Calculate warranty expiration
+    let warranty_expires_at = null
+    if (purchase_date && warranty_months && warranty_months > 0) {
+      const purchaseDate = new Date(purchase_date)
+      purchaseDate.setMonth(purchaseDate.getMonth() + warranty_months)
+      warranty_expires_at = purchaseDate.toISOString().split('T')[0]
+    }
+
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (item_name !== undefined) updateData.item_name = item_name
+    if (merchant !== undefined) updateData.merchant = merchant
+    if (purchase_date !== undefined) updateData.purchase_date = purchase_date
+    if (warranty_months !== undefined) {
+      updateData.warranty_months = warranty_months
+      updateData.warranty_expires_at = warranty_expires_at
+    }
+    if (notes !== undefined) updateData.notes = notes
+    if (category !== undefined) updateData.category = category
+
+    const { data, error } = await supabase
+      .from('purchases')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('*, documents(*)')
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+}
+
 // DELETE /api/purchases/[id] - Delete purchase and associated storage objects
 export async function DELETE(
   request: NextRequest,
@@ -85,4 +142,3 @@ export async function DELETE(
 
   return NextResponse.json({ success: true })
 }
-

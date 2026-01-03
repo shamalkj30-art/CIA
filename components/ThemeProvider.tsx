@@ -13,8 +13,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('system')
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
+  // Default to dark theme for our cosmic design
+  const [theme, setTheme] = useState<Theme>('dark')
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -22,6 +23,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem('theme') as Theme | null
     if (stored) {
       setTheme(stored)
+    } else {
+      // If no stored preference, default to dark
+      setTheme('dark')
     }
   }, [])
 
@@ -60,6 +64,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme, mounted])
 
+  // Apply dark class immediately to prevent flash
+  useEffect(() => {
+    if (!mounted) {
+      document.documentElement.classList.add('dark')
+    }
+  }, [mounted])
+
   if (!mounted) {
     return <>{children}</>
   }
@@ -78,4 +89,3 @@ export function useTheme() {
   }
   return context
 }
-

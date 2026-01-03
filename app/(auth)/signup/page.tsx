@@ -1,18 +1,29 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 export default function SignUpPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({
+        x: (e.clientX / window.innerWidth) * 100,
+        y: (e.clientY / window.innerHeight) * 100,
+      })
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,39 +83,76 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      {/* Decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-400/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-400/20 rounded-full blur-3xl" />
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0">
+        <div className="absolute inset-0 bg-[var(--background)]" />
+        <div 
+          className="absolute w-[800px] h-[800px] rounded-full blur-[120px] bg-[var(--primary)]/20 transition-transform duration-1000 ease-out"
+          style={{
+            left: `${mousePosition.x * 0.3}%`,
+            top: `${mousePosition.y * 0.3}%`,
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+        <div 
+          className="absolute w-[600px] h-[600px] rounded-full blur-[100px] bg-[var(--accent)]/15 transition-transform duration-1000 ease-out"
+          style={{
+            right: `${(100 - mousePosition.x) * 0.2}%`,
+            bottom: `${(100 - mousePosition.y) * 0.2}%`,
+            transform: 'translate(50%, 50%)',
+          }}
+        />
+        <div 
+          className="absolute w-[400px] h-[400px] rounded-full blur-[80px] bg-[var(--tertiary)]/10 transition-transform duration-1000 ease-out"
+          style={{
+            left: '50%',
+            top: '50%',
+            transform: `translate(calc(-50% + ${(mousePosition.x - 50) * 0.1}px), calc(-50% + ${(mousePosition.y - 50) * 0.1}px))`,
+          }}
+        />
+      </div>
+
+      {/* Grid Pattern */}
+      <div className="fixed inset-0 pointer-events-none opacity-20">
+        <div 
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, var(--border) 1px, transparent 1px),
+              linear-gradient(to bottom, var(--border) 1px, transparent 1px)
+            `,
+            backgroundSize: '60px 60px',
+          }}
+        />
       </div>
 
       {/* Logo */}
-      <Link href="/" className="relative flex items-center gap-3 mb-8">
-        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
+      <Link href="/" className="relative flex items-center gap-3 mb-8 animate-fade-in">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center shadow-lg glow-primary">
           <span className="text-white font-bold text-xl">C</span>
         </div>
-        <span className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">Cyncro</span>
+        <span className="text-2xl font-bold text-[var(--foreground)]">Cyncro</span>
       </Link>
 
       {/* Sign Up Card */}
-      <div className="relative card w-full max-w-md shadow-2xl shadow-slate-200/50 dark:shadow-black/20 border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
-        <h1 className="text-2xl font-bold text-center mb-2">Create your account</h1>
-        <p className="text-[var(--muted)] text-center mb-6">
-          Start managing your warranties today
+      <div className="relative glass w-full max-w-md p-8 animate-fade-in-up" style={{ animationDelay: '0.1s', opacity: 0 }}>
+        <h1 className="text-2xl font-bold text-center text-[var(--foreground)] mb-2">Create your account</h1>
+        <p className="text-[var(--muted)] text-center mb-8">
+          Start protecting your purchases today
         </p>
 
         {/* Google Sign Up */}
         <button
           onClick={handleGoogleSignUp}
           disabled={googleLoading || loading}
-          className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-[var(--border)] bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--background-secondary)] hover:bg-[var(--card-hover)] transition-all font-medium disabled:opacity-50"
         >
           {googleLoading ? (
-            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+            <div className="relative w-5 h-5">
+              <div className="absolute inset-0 rounded-full border-2 border-[var(--border)]" />
+              <div className="absolute inset-0 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
+            </div>
           ) : (
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -113,22 +161,22 @@ export default function SignUpPage() {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
           )}
-          Continue with Google
+          <span className="text-[var(--foreground)]">Continue with Google</span>
         </button>
 
         {/* Divider */}
-        <div className="relative my-6">
+        <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-[var(--border)]" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-white dark:bg-slate-900 text-[var(--muted)]">or continue with email</span>
+            <span className="px-4 bg-[var(--card)] text-[var(--muted)]">or continue with email</span>
           </div>
         </div>
 
         <form onSubmit={handleSignUp} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-[var(--foreground)] mb-2">
               Email address
             </label>
             <input
@@ -144,7 +192,7 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-[var(--foreground)] mb-2">
               Password
             </label>
             <input
@@ -161,7 +209,7 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-[var(--foreground)] mb-2">
               Confirm password
             </label>
             <input
@@ -179,10 +227,10 @@ export default function SignUpPage() {
 
           {message && (
             <div
-              className={`p-3 rounded-lg text-sm ${
+              className={`p-3 rounded-xl text-sm ${
                 message.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                  ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20'
+                  : 'bg-[var(--error)]/10 text-[var(--error)] border border-[var(--error)]/20'
               }`}
             >
               {message.text}
@@ -192,14 +240,14 @@ export default function SignUpPage() {
           <button
             type="submit"
             disabled={loading || !email || !password || !confirmPassword}
-            className="btn btn-primary w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 border-0 shadow-lg shadow-emerald-500/25"
+            className="btn btn-primary w-full py-3"
           >
             {loading ? (
               <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
+                <div className="relative w-5 h-5">
+                  <div className="absolute inset-0 rounded-full border-2 border-white/30" />
+                  <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                </div>
                 Creating account...
               </span>
             ) : (
@@ -208,20 +256,21 @@ export default function SignUpPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-[var(--muted)]">
+        <p className="mt-8 text-center text-sm text-[var(--muted)]">
           Already have an account?{' '}
-          <Link href="/login" className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium">
+          <Link href="/login" className="text-[var(--primary)] hover:underline font-medium">
             Sign in
           </Link>
         </p>
       </div>
 
-      <p className="relative mt-8 text-sm text-[var(--muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)] transition-colors">
-          ← Back to home
-        </Link>
-      </p>
+      <Link 
+        href="/" 
+        className="relative mt-8 text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors animate-fade-in"
+        style={{ animationDelay: '0.2s', opacity: 0 }}
+      >
+        ← Back to home
+      </Link>
     </div>
   )
 }
-
