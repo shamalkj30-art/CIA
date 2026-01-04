@@ -298,7 +298,7 @@ ${contextHints}
 Use the extract_order_data tool to return structured data.`
 
       const response = await anthropic.messages.create({
-        model: 'claude-3-7-sonnet-20250219', // Latest Sonnet - fast and accurate
+        model: 'claude-3-5-sonnet-20241022', // Claude 3.5 Sonnet - fast and accurate
         max_tokens: 4096,
         tools: [EXTRACTION_TOOL],
         tool_choice: { type: 'tool', name: 'extract_order_data' },
