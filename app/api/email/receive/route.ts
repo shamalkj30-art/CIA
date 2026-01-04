@@ -359,20 +359,32 @@ ${emailContentForAI}`
     // Check if this is an order confirmation
     // Fallback: Check subject/from for order confirmation keywords if AI says no
     const orderKeywords = [
-      'takk for kjøpet', 'thanks for purchase', 'order confirmation', 'orderbekreftelse',
-      'bestilling', 'ordre', 'purchase confirmation', 'bekreftelse'
+      'takk for kjøpet', 'takk for kjøp', 'takk for ditt kjøp', 'thanks for purchase', 
+      'order confirmation', 'orderbekreftelse', 'bestilling', 'ordre', 
+      'purchase confirmation', 'bekreftelse', 'kjøp', 'purchase'
     ]
     const subjectLower = subject.toLowerCase()
     const hasOrderKeywords = orderKeywords.some(keyword => subjectLower.includes(keyword))
     const fromLower = from.toLowerCase()
-    const isFromKnownStore = fromLower.includes('zara') || fromLower.includes('h&m') || 
-                            fromLower.includes('hm.com') || fromLower.includes('nike') ||
-                            fromLower.includes('adidas') || fromLower.includes('amazon')
+    const emailContentLower = emailContent.toLowerCase()
+    const isFromKnownStore = fromLower.includes('zara') || fromLower.includes('mango') ||
+                            fromLower.includes('h&m') || fromLower.includes('hm.com') || 
+                            fromLower.includes('nike') || fromLower.includes('adidas') || 
+                            fromLower.includes('amazon') || emailContentLower.includes('mango') ||
+                            emailContentLower.includes('zara')
 
-    if (!analysis || (analysis.is_order_confirmation === false && !hasOrderKeywords && !isFromKnownStore)) {
-      console.log('Not an order confirmation email')
-      console.log('Subject keywords check:', hasOrderKeywords)
-      console.log('Known store check:', isFromKnownStore)
+    // Check if we should process based on keywords/store detection
+    const shouldProcess = hasOrderKeywords || isFromKnownStore
+    
+    console.log('Order confirmation check:')
+    console.log('- AI says:', analysis?.is_order_confirmation)
+    console.log('- Subject keywords:', hasOrderKeywords, '(subject:', subject, ')')
+    console.log('- Known store:', isFromKnownStore, '(from:', from, ')')
+    console.log('- Should process:', shouldProcess)
+
+    // If AI says no AND no keywords/store detected, reject
+    if (!analysis || (analysis.is_order_confirmation === false && !shouldProcess)) {
+      console.log('Rejecting: Not an order confirmation email')
       await supabase.from('processed_emails').insert({
         user_id: userId,
         email_id: messageId,
@@ -381,22 +393,52 @@ ${emailContentForAI}`
       return NextResponse.json({ message: 'Email does not appear to be an order confirmation' }, { status: 200 })
     }
 
-    // If AI said no but we have keywords, create a basic analysis
-    if (!analysis || analysis.is_order_confirmation === false) {
-      console.log('AI said no, but keywords detected - creating basic analysis')
-      analysis = {
-        is_order_confirmation: true,
-        item_name: subject.replace(/^(Fwd:|Re:|FW:)\s*/i, '').trim() || 'Order from Email',
-        merchant: from.includes('@') ? from.split('@')[1].split('.')[0] : from,
-        order_number: null,
-        purchase_date: new Date().toISOString().split('T')[0],
-        total_amount: null,
-        currency: 'NOK',
-        return_deadline_days: 14, // Default for Norwegian stores
-        warranty_months: 0,
-        items_list: [],
-        confidence: 'medium',
-        notes: 'Auto-detected from subject/from keywords'
+    // If AI said no but we have keywords/store, create a basic analysis and re-run AI with better context
+    if (!analysis || (analysis.is_order_confirmation === false && shouldProcess)) {
+      console.log('AI said no, but keywords/store detected - forcing processing and re-analyzing with better prompt')
+      
+      // Try AI again with more explicit instruction
+      try {
+        const retryCompletion = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            { 
+              role: 'system', 
+              content: `This email subject contains "${subject}" which indicates it's an order confirmation. Extract purchase information from the email content. Return JSON with: is_order_confirmation: true, merchant, order_number, total_amount, currency, item_name, items_list, purchase_date, return_deadline_days.` 
+            },
+            { role: 'user', content: emailContent }
+          ],
+          max_tokens: 1500,
+          temperature: 0,
+          response_format: { type: 'json_object' }
+        })
+        
+        const retryContent = retryCompletion.choices[0]?.message?.content || '{}'
+        const retryAnalysis = JSON.parse(retryContent)
+        
+        if (retryAnalysis.is_order_confirmation === true) {
+          console.log('Retry AI succeeded:', retryAnalysis)
+          analysis = retryAnalysis
+        } else {
+          throw new Error('Retry also failed')
+        }
+      } catch (retryError) {
+        console.log('Retry failed, using fallback analysis')
+        // Fallback: create basic analysis from keywords
+        analysis = {
+          is_order_confirmation: true,
+          item_name: subject.replace(/^(Fwd:|Re:|FW:)\s*/i, '').trim() || 'Order from Email',
+          merchant: from.includes('@') ? from.split('@')[1].split('.')[0] : from,
+          order_number: null,
+          purchase_date: emailReceivedDate,
+          total_amount: null,
+          currency: 'NOK',
+          return_deadline_days: 14, // Default for Norwegian stores
+          warranty_months: 0,
+          items_list: [],
+          confidence: 'low',
+          notes: 'Auto-detected from subject/from keywords - AI extraction failed'
+        }
       }
     }
 
