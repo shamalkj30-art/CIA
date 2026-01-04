@@ -298,13 +298,18 @@ export async function syncGmailEmails(userId: string) {
   const errors: string[] = []
 
   for (const msg of messages) {
+    // Skip if no message ID
+    if (!msg.id) continue
+    
+    const messageId = msg.id
+    
     try {
       // Check if already processed
       const { data: existing } = await supabase
         .from('processed_emails')
         .select('id')
         .eq('user_id', userId)
-        .eq('email_id', msg.id)
+        .eq('email_id', messageId)
         .single()
 
       if (existing) {
@@ -312,7 +317,7 @@ export async function syncGmailEmails(userId: string) {
       }
 
       // Fetch full message
-      const email = await fetchEmailMessage(gmail, msg.id)
+      const email = await fetchEmailMessage(gmail, messageId)
 
       // Analyze with AI
       const analysis = await analyzeEmailForOrder(email.subject, email.body, email.from)
@@ -321,7 +326,7 @@ export async function syncGmailEmails(userId: string) {
         // Mark as processed but not an order
         await supabase.from('processed_emails').insert({
           user_id: userId,
-          email_id: msg.id,
+          email_id: messageId,
           result: 'not_order',
         })
         continue
@@ -339,7 +344,7 @@ export async function syncGmailEmails(userId: string) {
         if (existingPurchase) {
           await supabase.from('processed_emails').insert({
             user_id: userId,
-            email_id: msg.id,
+            email_id: messageId,
             result: 'ignored',
             purchase_id: existingPurchase.id,
           })
@@ -401,7 +406,7 @@ export async function syncGmailEmails(userId: string) {
               subject: email.subject,
               sender: email.from,
               received_at: email.date,
-              gmail_message_id: msg.id,
+              gmail_message_id: messageId,
               confidence: analysis.confidence,
             },
             auto_detected: true,
@@ -431,18 +436,18 @@ export async function syncGmailEmails(userId: string) {
       // Mark email as processed
       await supabase.from('processed_emails').insert({
         user_id: userId,
-        email_id: msg.id,
+        email_id: messageId,
         result: 'created_purchase',
       })
 
     } catch (error: any) {
-      console.error(`Error processing email ${msg.id}:`, error)
+      console.error(`Error processing email ${messageId}:`, error)
       errors.push(error.message)
       
       // Mark as failed
       await supabase.from('processed_emails').insert({
         user_id: userId,
-        email_id: msg.id,
+        email_id: messageId,
         result: 'failed',
         error_message: error.message,
       }).catch(() => {})
