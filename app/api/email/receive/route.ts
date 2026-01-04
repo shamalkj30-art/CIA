@@ -22,7 +22,17 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 // AI prompt for extracting purchase info from order confirmation emails
-const ORDER_EXTRACTION_PROMPT = `You are an expert at extracting purchase information from order confirmation emails.
+const ORDER_EXTRACTION_PROMPT = `You are an expert at extracting purchase information from order confirmation emails, including forwarded emails in multiple languages (especially Norwegian).
+
+CRITICAL: If the email contains ANY of these indicators, it IS an order confirmation:
+- "Takk for kjøpet" / "Thanks for your purchase" / "Order confirmation" / "Orderbekreftelse"
+- Order numbers, order IDs, bestillingsnummer
+- Item lists with prices
+- Total amounts, payment information
+- Delivery dates, shipping information
+- Store/brand names (Zara, H&M, etc.)
+
+Even if the email is forwarded (starts with "Fwd:"), extract the ORIGINAL email content inside.
 
 Analyze the email content and extract the following information. Be thorough and accurate.
 
@@ -46,12 +56,14 @@ Return a JSON object with these fields:
 }
 
 Rules:
-- If multiple items, list them in items_list and use descriptive item_name
+- If multiple items, list them in items_list and use descriptive item_name like "Multiple items from Zara"
 - For return_deadline_days, extract from return policy (common: 14, 30, 60 days)
-- Norwegian stores often use: 14 dager (days), angrerett (right of withdrawal)
-- If price has comma as decimal (like 86,98), convert to 86.98
-- Look for: "ordrenummer", "bestilling", "bekreftelse", "ordre" (Norwegian)
-- Return is_order_confirmation: false if this is NOT a purchase confirmation
+- Norwegian stores often use: 14 dager (days), angrerett (right of withdrawal), 30 dagers angrerett
+- If price has comma as decimal (like 1,435,00 NOK), convert to 1435.00
+- Look for Norwegian keywords: "ordrenummer", "bestilling", "bekreftelse", "ordre", "bestillingsnummer", "BESTILLING NR"
+- Look for: "TIL SAMMEN" (total), "VARER" (items), "FORSENDELSESKOSTNADER" (shipping)
+- If subject contains "Fwd:" or "Forwarded", look INSIDE the email body for the original order confirmation
+- Return is_order_confirmation: false ONLY if this is clearly NOT a purchase (like a newsletter, marketing email, etc.)
 
 Return ONLY valid JSON, no explanation.`
 
@@ -159,16 +171,44 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare email content for AI analysis
-    // Combine subject, text body, and cleaned HTML
-    const cleanHtml = htmlBody.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-                              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                              .replace(/<[^>]+>/g, ' ')
-                              .replace(/\s+/g, ' ')
-                              .trim()
+    // For forwarded emails, extract the full content including the original email
+    let emailContentForAI = ''
     
-    const emailContent = `Subject: ${subject}\n\nFrom: ${from}\n\n${textBody || cleanHtml}`.slice(0, 8000)
+    // Prefer HTML body if available (contains more structure)
+    if (htmlBody) {
+      // Remove scripts and styles but keep structure
+      let cleanHtml = htmlBody
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      
+      // Extract text from HTML (preserve line breaks for better context)
+      const tempDiv = cleanHtml
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim()
+      
+      emailContentForAI = tempDiv
+    } else if (textBody) {
+      emailContentForAI = textBody
+    }
     
-    console.log('Email content for AI (preview):', emailContent.slice(0, 500))
+    // Combine with metadata
+    const fullContent = `Subject: ${subject}\nFrom: ${from}\n\n${emailContentForAI}`
+    
+    // Take up to 12000 chars (increased for forwarded emails with full content)
+    const emailContent = fullContent.slice(0, 12000)
+    
+    console.log('Email content length:', emailContent.length)
+    console.log('Email content for AI (first 1000 chars):', emailContent.slice(0, 1000))
+    console.log('Email content for AI (last 500 chars):', emailContent.slice(-500))
 
     // Analyze with AI
     const openai = getOpenAIClient()
@@ -187,11 +227,20 @@ export async function POST(request: NextRequest) {
       })
 
       const content = completion.choices[0]?.message?.content || '{}'
-      console.log('AI response:', content)
+      console.log('AI raw response:', content)
       
       const jsonMatch = content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
-        analysis = JSON.parse(jsonMatch[0])
+        try {
+          analysis = JSON.parse(jsonMatch[0])
+          console.log('AI parsed analysis:', JSON.stringify(analysis, null, 2))
+        } catch (parseError) {
+          console.error('Failed to parse AI JSON:', parseError)
+          console.error('Raw content:', content)
+        }
+      } else {
+        console.error('No JSON found in AI response')
+        console.error('Raw content:', content)
       }
     } catch (aiError: any) {
       console.error('AI analysis error:', aiError)
@@ -208,14 +257,47 @@ export async function POST(request: NextRequest) {
     console.log('AI analysis result:', analysis)
 
     // Check if this is an order confirmation
-    if (!analysis || analysis.is_order_confirmation === false) {
+    // Fallback: Check subject/from for order confirmation keywords if AI says no
+    const orderKeywords = [
+      'takk for kjøpet', 'thanks for purchase', 'order confirmation', 'orderbekreftelse',
+      'bestilling', 'ordre', 'purchase confirmation', 'bekreftelse'
+    ]
+    const subjectLower = subject.toLowerCase()
+    const hasOrderKeywords = orderKeywords.some(keyword => subjectLower.includes(keyword))
+    const fromLower = from.toLowerCase()
+    const isFromKnownStore = fromLower.includes('zara') || fromLower.includes('h&m') || 
+                            fromLower.includes('hm.com') || fromLower.includes('nike') ||
+                            fromLower.includes('adidas') || fromLower.includes('amazon')
+
+    if (!analysis || (analysis.is_order_confirmation === false && !hasOrderKeywords && !isFromKnownStore)) {
       console.log('Not an order confirmation email')
+      console.log('Subject keywords check:', hasOrderKeywords)
+      console.log('Known store check:', isFromKnownStore)
       await supabase.from('processed_emails').insert({
         user_id: userId,
         email_id: messageId,
         result: 'not_order'
       })
       return NextResponse.json({ message: 'Email does not appear to be an order confirmation' }, { status: 200 })
+    }
+
+    // If AI said no but we have keywords, create a basic analysis
+    if (!analysis || analysis.is_order_confirmation === false) {
+      console.log('AI said no, but keywords detected - creating basic analysis')
+      analysis = {
+        is_order_confirmation: true,
+        item_name: subject.replace(/^(Fwd:|Re:|FW:)\s*/i, '').trim() || 'Order from Email',
+        merchant: from.includes('@') ? from.split('@')[1].split('.')[0] : from,
+        order_number: null,
+        purchase_date: new Date().toISOString().split('T')[0],
+        total_amount: null,
+        currency: 'NOK',
+        return_deadline_days: 14, // Default for Norwegian stores
+        warranty_months: 0,
+        items_list: [],
+        confidence: 'medium',
+        notes: 'Auto-detected from subject/from keywords'
+      }
     }
 
     // Store the email HTML as a receipt document
@@ -234,21 +316,21 @@ export async function POST(request: NextRequest) {
       // Use the attachment as receipt
       const attachmentData = receiptAttachment.content || receiptAttachment.data
       if (attachmentData) {
-        const fileBuffer = Buffer.from(attachmentData, 'base64')
-        fileType = receiptAttachment.content_type || receiptAttachment.contentType || 'application/octet-stream'
+      const fileBuffer = Buffer.from(attachmentData, 'base64')
+      fileType = receiptAttachment.content_type || receiptAttachment.contentType || 'application/octet-stream'
         const attachmentFileName = receiptAttachment.filename || receiptAttachment.name || `receipt_${Date.now()}`
         fileName = attachmentFileName
-        fileSize = fileBuffer.length
-        
-        const timestamp = Date.now()
+      fileSize = fileBuffer.length
+
+      const timestamp = Date.now()
         const sanitizedName = attachmentFileName.replace(/[^a-zA-Z0-9.-]/g, '_')
-        storagePath = `${userId}/${timestamp}_${sanitizedName}`
+      storagePath = `${userId}/${timestamp}_${sanitizedName}`
 
-        const { error: uploadError } = await supabase.storage
-          .from('receipts')
-          .upload(storagePath, fileBuffer, { contentType: fileType || undefined })
+      const { error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(storagePath, fileBuffer, { contentType: fileType || undefined })
 
-        if (uploadError) {
+      if (uploadError) {
           console.error('Attachment upload error:', uploadError)
           storagePath = null
         } else {
@@ -320,12 +402,12 @@ export async function POST(request: NextRequest) {
 
     // Create the purchase
     const purchaseData = {
-      user_id: userId,
+              user_id: userId,
       item_name: analysis.item_name || subject || 'Order from Email',
-      merchant: analysis.merchant || null,
-      purchase_date: analysis.purchase_date || new Date().toISOString().split('T')[0],
+              merchant: analysis.merchant || null,
+              purchase_date: analysis.purchase_date || new Date().toISOString().split('T')[0],
       price: analysis.total_amount || null,
-      warranty_months: analysis.warranty_months || 0,
+              warranty_months: analysis.warranty_months || 0,
       warranty_expires_at: analysis.warranty_months > 0 
         ? (() => {
             const d = new Date(analysis.purchase_date || new Date())
@@ -353,8 +435,8 @@ export async function POST(request: NextRequest) {
     const { data: purchase, error: purchaseError } = await supabase
       .from('purchases')
       .insert(purchaseData)
-      .select()
-      .single()
+            .select()
+            .single()
 
     if (purchaseError) {
       console.error('Purchase creation error:', purchaseError)
@@ -372,13 +454,13 @@ export async function POST(request: NextRequest) {
     // Attach document if we have one
     if (purchase && storagePath && fileName) {
       const { error: docError } = await supabase.from('documents').insert({
-        purchase_id: purchase.id,
-        user_id: userId,
-        storage_path: storagePath,
+              purchase_id: purchase.id,
+              user_id: userId,
+              storage_path: storagePath,
         file_name: fileName,
-        file_type: fileType,
-        file_size: fileSize,
-      })
+              file_type: fileType,
+              file_size: fileSize,
+            })
       
       if (docError) {
         console.error('Document insert error:', docError)
@@ -420,9 +502,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('=== EMAIL PROCESSING COMPLETE ===')
-    
-    return NextResponse.json({
-      success: true,
+
+          return NextResponse.json({
+            success: true,
       purchase_id: purchase.id,
       item_name: purchase.item_name,
       merchant: purchase.merchant,
