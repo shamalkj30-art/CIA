@@ -15,6 +15,19 @@ export default function PurchasesPage() {
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [filterBy, setFilterBy] = useState<FilterOption>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('#sort-dropdown-container')) {
+        setSortDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
 
   // Debounce search
   useEffect(() => {
@@ -175,67 +188,134 @@ export default function PurchasesPage() {
         </div>
       </div>
 
-      {/* Filters & Search */}
-      <div className="card p-4 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <svg
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+      {/* Search Bar */}
+      <div className="card p-4 mb-4">
+        <div className="relative">
+          <svg
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, merchant..."
+            className="w-full h-12 pl-12 pr-4 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[var(--text-muted)] hover:bg-[var(--text-secondary)] text-white flex items-center justify-center transition-colors"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, merchant..."
-              className="input pl-12"
-            />
-          </div>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
 
-          {/* Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[var(--text-muted)] hidden sm:block">Filter:</span>
-            <div className="flex gap-1 bg-[var(--surface-subtle)] rounded-lg p-1">
+      {/* Filters & Sort */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        {/* Filter Tabs */}
+        <div className="flex gap-1 bg-[var(--card)] rounded-xl p-1 border border-[var(--border)]">
+          {[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'expiring', label: 'Expiring' },
+            { value: 'expired', label: 'Expired' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setFilterBy(option.value as FilterOption)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                filterBy === option.value
+                  ? 'bg-[var(--primary)] text-white shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Sort Dropdown */}
+        <div id="sort-dropdown-container" className="relative">
+          <button
+            onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+            className={`flex items-center gap-2 px-4 py-2.5 bg-[var(--card)] border rounded-xl text-sm font-medium text-[var(--text-primary)] transition-all ${
+              sortDropdownOpen ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/20' : 'border-[var(--border)] hover:border-[var(--primary)]'
+            }`}
+          >
+            <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+            </svg>
+            <span>
+              {sortBy === 'newest' && 'Newest first'}
+              {sortBy === 'oldest' && 'Oldest first'}
+              {sortBy === 'name' && 'Name A-Z'}
+              {sortBy === 'expiring' && 'Expiring soonest'}
+            </span>
+            <svg className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${sortDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {/* Sort Dropdown Menu */}
+          {sortDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-52 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
               {[
-                { value: 'all', label: 'All' },
-                { value: 'active', label: 'Active' },
-                { value: 'expiring', label: 'Expiring' },
-                { value: 'expired', label: 'Expired' },
+                { value: 'newest', label: 'Newest first', icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                  </svg>
+                )},
+                { value: 'oldest', label: 'Oldest first', icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" style={{transform: 'scaleY(-1)'}} />
+                  </svg>
+                )},
+                { value: 'name', label: 'Name A-Z', icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                  </svg>
+                )},
+                { value: 'expiring', label: 'Expiring soonest', icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )},
               ].map((option) => (
                 <button
                   key={option.value}
-                  onClick={() => setFilterBy(option.value as FilterOption)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    filterBy === option.value
-                      ? 'bg-[var(--primary)] text-white shadow-sm'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  onClick={() => {
+                    setSortBy(option.value as SortOption)
+                    setSortDropdownOpen(false)
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${
+                    sortBy === option.value
+                      ? 'bg-[var(--primary-soft)] text-[var(--primary)] font-medium'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]'
                   }`}
                 >
-                  {option.label}
+                  <span className="text-[var(--text-muted)]">{option.icon}</span>
+                  <span>{option.label}</span>
+                  {sortBy === option.value && (
+                    <svg className="w-4 h-4 ml-auto text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Sort */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[var(--text-muted)] hidden sm:block">Sort:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="input py-2 px-3 w-auto min-w-[140px]"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="name">Name A-Z</option>
-              <option value="expiring">Expiring soonest</option>
-            </select>
-          </div>
+          )}
         </div>
       </div>
 
