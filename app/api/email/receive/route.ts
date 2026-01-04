@@ -22,50 +22,96 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 // AI prompt for extracting purchase info from order confirmation emails
-const ORDER_EXTRACTION_PROMPT = `You are an expert at extracting purchase information from order confirmation emails, including forwarded emails in multiple languages (especially Norwegian).
+const ORDER_EXTRACTION_PROMPT = `You are a precise data extraction system. Extract ONLY information that is EXPLICITLY stated in the email. DO NOT guess, estimate, or hallucinate.
 
-CRITICAL: If the email contains ANY of these indicators, it IS an order confirmation:
-- "Takk for kjøpet" / "Thanks for your purchase" / "Order confirmation" / "Orderbekreftelse"
-- Order numbers, order IDs, bestillingsnummer
-- Item lists with prices
-- Total amounts, payment information
-- Delivery dates, shipping information
-- Store/brand names (Zara, H&M, etc.)
+CRITICAL RULES:
+1. Extract ONLY what you can see clearly in the email text
+2. If a field is not found, use null (not a guess)
+3. For dates, use the email's received date if no purchase date is stated
+4. For prices, extract the EXACT number shown (convert comma decimals: 1,217,00 → 1217.00)
 
-Even if the email is forwarded (starts with "Fwd:"), extract the ORIGINAL email content inside.
+EXTRACTION INSTRUCTIONS:
 
-Analyze the email content and extract the following information. Be thorough and accurate.
+1. MERCHANT: Look for store/brand name in:
+   - Email sender domain (news@email.mango → "Mango")
+   - Email subject
+   - Email body headers/logos
+   - Example: "MANGO" logo or "news@email.mango" → merchant: "Mango"
 
-IMPORTANT: Most order confirmations DON'T have warranty info - that's OK, set warranty_months to 0.
-Look for return/exchange policies - they often mention "14 days", "30 days", etc.
+2. ORDER NUMBER: Look for:
+   - "Bestillingsnr." / "Bestillingsnummer" / "Order number" / "Order #"
+   - Barcode numbers (like "EX38T7" or "EX387700")
+   - Reference codes
+   - Example: "Bestillingsnr. EX38T7" → order_number: "EX38T7"
 
-Return a JSON object with these fields:
+3. TOTAL AMOUNT: Look for:
+   - "Totalt" / "Total" / "TIL SAMMEN" / "Sum"
+   - Usually at bottom of item list
+   - Extract the number, convert comma to decimal
+   - Example: "kr 1 217,00" → total_amount: 1217.00, currency: "NOK"
+   - Example: "$86,98" → total_amount: 86.98, currency: "USD"
+
+4. ITEMS: Count items listed:
+   - If 1 item: use item name
+   - If 2+ items: use "Multiple items from [Merchant]"
+   - List all items in items_list array
+
+5. PURCHASE DATE:
+   - Look for: "Dato" / "Date" / "Kjøpt" / "Purchased"
+   - If not found, use email received date (provided separately)
+   - Format: YYYY-MM-DD
+
+6. RETURN DEADLINE:
+   - Look for: "14 dager" / "30 dager" / "angrerett" / "return policy"
+   - Norwegian default: 14 days if not specified
+   - Format as number of days
+
+Return this EXACT JSON structure:
 {
   "is_order_confirmation": true/false,
-  "item_name": "Main item or 'Multiple items from [Store]' if multiple",
-  "merchant": "Store/brand name",
-  "order_number": "Order/confirmation number if present",
-  "purchase_date": "YYYY-MM-DD format, use email date if not in content",
-  "total_amount": 123.45,
-  "currency": "USD/EUR/NOK/etc",
-  "return_deadline_days": 14,
+  "item_name": "string or null",
+  "merchant": "string or null",
+  "order_number": "string or null",
+  "purchase_date": "YYYY-MM-DD or null",
+  "total_amount": number or null,
+  "currency": "string or null",
+  "return_deadline_days": number or null,
   "warranty_months": 0,
-  "items_list": ["item 1", "item 2"],
+  "items_list": ["item1", "item2"] or [],
   "confidence": "high/medium/low",
-  "notes": "Any relevant details like delivery date, tracking, etc"
+  "notes": "string or null"
 }
 
-Rules:
-- If multiple items, list them in items_list and use descriptive item_name like "Multiple items from Zara"
-- For return_deadline_days, extract from return policy (common: 14, 30, 60 days)
-- Norwegian stores often use: 14 dager (days), angrerett (right of withdrawal), 30 dagers angrerett
-- If price has comma as decimal (like 1,435,00 NOK), convert to 1435.00
-- Look for Norwegian keywords: "ordrenummer", "bestilling", "bekreftelse", "ordre", "bestillingsnummer", "BESTILLING NR"
-- Look for: "TIL SAMMEN" (total), "VARER" (items), "FORSENDELSESKOSTNADER" (shipping)
-- If subject contains "Fwd:" or "Forwarded", look INSIDE the email body for the original order confirmation
-- Return is_order_confirmation: false ONLY if this is clearly NOT a purchase (like a newsletter, marketing email, etc.)
+EXAMPLES:
 
-Return ONLY valid JSON, no explanation.`
+Norwegian Mango email:
+- Subject: "Takk for ditt kjøp hos Mango"
+- Body: "Bestillingsnr. EX38T7" + "Totalt: kr 1 217,00" + 3 items listed
+→ {
+  "is_order_confirmation": true,
+  "item_name": "Multiple items from Mango",
+  "merchant": "Mango",
+  "order_number": "EX38T7",
+  "total_amount": 1217.00,
+  "currency": "NOK",
+  "items_list": ["Leopardmønstret kjole", "Prikkete bluse", "Langt skjørt"],
+  "confidence": "high"
+}
+
+Norwegian Zara email:
+- Subject: "Takk for kjøpet"
+- Body: "BESTILLING NR. 54539983872" + "TIL SAMMEN 1 435,00 NOK" + 4 items
+→ {
+  "is_order_confirmation": true,
+  "item_name": "Multiple items from Zara",
+  "merchant": "Zara",
+  "order_number": "54539983872",
+  "total_amount": 1435.00,
+  "currency": "NOK",
+  "confidence": "high"
+}
+
+Return ONLY the JSON object, no other text.`
 
 // This endpoint receives emails via webhook from Resend
 // POST /api/email/receive
@@ -171,44 +217,72 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare email content for AI analysis
-    // For forwarded emails, extract the full content including the original email
+    // Extract the FULL email content with better structure preservation
     let emailContentForAI = ''
     
-    // Prefer HTML body if available (contains more structure)
+    // Get email received date (fallback for purchase_date)
+    const emailReceivedDate = new Date().toISOString().split('T')[0]
+    
+    // Prefer HTML body if available (contains more structure and numbers)
     if (htmlBody) {
-      // Remove scripts and styles but keep structure
+      // Remove scripts and styles but preserve text structure
       let cleanHtml = htmlBody
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
       
-      // Extract text from HTML (preserve line breaks for better context)
-      const tempDiv = cleanHtml
+      // Better text extraction - preserve structure for numbers and lists
+      // Replace block elements with newlines to preserve structure
+      cleanHtml = cleanHtml
         .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
         .replace(/<\/div>/gi, '\n')
+        .replace(/<\/li>/gi, '\n')
+        .replace(/<\/tr>/gi, '\n')
+        .replace(/<\/td>/gi, ' ')
+        .replace(/<\/th>/gi, ' ')
+      
+      // Remove all remaining HTML tags but keep text
+      cleanHtml = cleanHtml
         .replace(/<[^>]+>/g, ' ')
+      
+      // Decode HTML entities
+      cleanHtml = cleanHtml
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
-        .replace(/\s+/g, ' ')
+        .replace(/&#39;/g, "'")
+        .replace(/&euro;/g, '€')
+        .replace(/&pound;/g, '£')
+        .replace(/&yen;/g, '¥')
+      
+      // Clean up whitespace but preserve line breaks for structure
+      cleanHtml = cleanHtml
+        .replace(/[ \t]+/g, ' ') // Multiple spaces to single
+        .replace(/\n\s*\n\s*\n+/g, '\n\n') // Multiple newlines to double
         .trim()
       
-      emailContentForAI = tempDiv
+      emailContentForAI = cleanHtml
     } else if (textBody) {
       emailContentForAI = textBody
     }
     
-    // Combine with metadata
-    const fullContent = `Subject: ${subject}\nFrom: ${from}\n\n${emailContentForAI}`
+    // Combine with metadata - include received date for fallback
+    const fullContent = `Email Subject: ${subject}
+Email From: ${from}
+Email Received Date: ${emailReceivedDate}
+
+EMAIL CONTENT:
+${emailContentForAI}`
     
-    // Take up to 12000 chars (increased for forwarded emails with full content)
-    const emailContent = fullContent.slice(0, 12000)
+    // Take up to 15000 chars (increased for full email content)
+    const emailContent = fullContent.slice(0, 15000)
     
     console.log('Email content length:', emailContent.length)
-    console.log('Email content for AI (first 1000 chars):', emailContent.slice(0, 1000))
-    console.log('Email content for AI (last 500 chars):', emailContent.slice(-500))
+    console.log('Email content preview (first 1500 chars):', emailContent.slice(0, 1500))
+    console.log('Email content preview (last 800 chars):', emailContent.slice(-800))
 
     // Analyze with AI
     const openai = getOpenAIClient()
@@ -222,25 +296,51 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: ORDER_EXTRACTION_PROMPT },
           { role: 'user', content: emailContent }
         ],
-        max_tokens: 1000,
-        temperature: 0.1
+        max_tokens: 1500,
+        temperature: 0, // Use 0 for deterministic extraction
+        response_format: { type: 'json_object' } // Force JSON output
       })
 
       const content = completion.choices[0]?.message?.content || '{}'
       console.log('AI raw response:', content)
       
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        try {
-          analysis = JSON.parse(jsonMatch[0])
-          console.log('AI parsed analysis:', JSON.stringify(analysis, null, 2))
-        } catch (parseError) {
-          console.error('Failed to parse AI JSON:', parseError)
-          console.error('Raw content:', content)
+      try {
+        analysis = JSON.parse(content)
+        console.log('AI parsed analysis:', JSON.stringify(analysis, null, 2))
+        
+        // Validate extracted data
+        if (analysis.is_order_confirmation === true) {
+          // Ensure required fields have reasonable defaults
+          if (!analysis.item_name && analysis.merchant) {
+            analysis.item_name = `Order from ${analysis.merchant}`
+          }
+          if (!analysis.purchase_date) {
+            analysis.purchase_date = emailReceivedDate
+          }
+          if (!analysis.currency && analysis.total_amount) {
+            // Try to infer from email content
+            if (emailContent.includes('kr ') || emailContent.includes('NOK')) {
+              analysis.currency = 'NOK'
+            } else if (emailContent.includes('$') || emailContent.includes('USD')) {
+              analysis.currency = 'USD'
+            } else if (emailContent.includes('€') || emailContent.includes('EUR')) {
+              analysis.currency = 'EUR'
+            }
+          }
         }
-      } else {
-        console.error('No JSON found in AI response')
+      } catch (parseError) {
+        console.error('Failed to parse AI JSON:', parseError)
         console.error('Raw content:', content)
+        // Try to extract JSON from response if wrapped
+        const jsonMatch = content.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          try {
+            analysis = JSON.parse(jsonMatch[0])
+            console.log('AI parsed analysis (fallback):', JSON.stringify(analysis, null, 2))
+          } catch (e) {
+            console.error('Fallback parse also failed:', e)
+          }
+        }
       }
     } catch (aiError: any) {
       console.error('AI analysis error:', aiError)
@@ -392,25 +492,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate and set purchase date (use email received date as fallback)
+    let purchaseDate = analysis.purchase_date || emailReceivedDate
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) {
+      console.log('Invalid purchase_date format, using email received date:', purchaseDate)
+      purchaseDate = emailReceivedDate
+    }
+
     // Calculate return deadline
     let returnDeadline: string | null = null
     if (analysis.return_deadline_days && analysis.return_deadline_days > 0) {
-      const purchaseDate = analysis.purchase_date ? new Date(analysis.purchase_date) : new Date()
-      purchaseDate.setDate(purchaseDate.getDate() + analysis.return_deadline_days)
-      returnDeadline = purchaseDate.toISOString().split('T')[0]
+      const returnDate = new Date(purchaseDate)
+      returnDate.setDate(returnDate.getDate() + analysis.return_deadline_days)
+      returnDeadline = returnDate.toISOString().split('T')[0]
     }
 
     // Create the purchase
     const purchaseData = {
-              user_id: userId,
+      user_id: userId,
       item_name: analysis.item_name || subject || 'Order from Email',
-              merchant: analysis.merchant || null,
-              purchase_date: analysis.purchase_date || new Date().toISOString().split('T')[0],
+      merchant: analysis.merchant || null,
+      purchase_date: purchaseDate,
       price: analysis.total_amount || null,
-              warranty_months: analysis.warranty_months || 0,
+      warranty_months: analysis.warranty_months || 0,
       warranty_expires_at: analysis.warranty_months > 0 
         ? (() => {
-            const d = new Date(analysis.purchase_date || new Date())
+            const d = new Date(purchaseDate)
             d.setMonth(d.getMonth() + analysis.warranty_months)
             return d.toISOString().split('T')[0]
           })()
