@@ -729,7 +729,7 @@ export default function UploadPage() {
                 Price
               </label>
               <div className="relative">
-                <div className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center bg-[var(--surface-subtle)] border-r border-[var(--border)] rounded-l-[10px]">
+                <div className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center bg-[var(--surface-subtle)] border-r border-[var(--border)] rounded-l-[10px] pointer-events-none z-10">
                   <span className="text-[var(--text-muted)] font-medium">$</span>
                 </div>
                 <input
@@ -740,7 +740,8 @@ export default function UploadPage() {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="0.00"
-                  className="input pl-14"
+                  className="input"
+                  style={{ paddingLeft: '3.5rem' }}
                 />
               </div>
             </div>
