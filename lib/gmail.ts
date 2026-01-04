@@ -1,12 +1,12 @@
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 import type { OrderExtractionResult } from './types'
 
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!
-const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL 
+const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
   ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`
   : 'http://localhost:3000/api/auth/google/callback'
 
@@ -70,106 +70,177 @@ function getSupabaseAdmin() {
   )
 }
 
-// Get OpenAI client
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+// Get Anthropic client
+function getAnthropicClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 }
 
-// AI prompt for order extraction
-const ORDER_EXTRACTION_PROMPT = `You are an expert at analyzing emails to detect online order confirmations.
+// AI system prompt for Gmail order extraction (using Claude)
+const GMAIL_EXTRACTION_PROMPT = `You are an expert at analyzing emails to detect online order confirmations.
 
-Analyze the email and determine if it's an order confirmation. Look for:
-- Order/confirmation numbers
-- Item names and prices
-- Merchant/store name
-- Purchase date
-- Return policy/deadline
-- Shipping/delivery information
+## YOUR TASK
+Analyze the email and determine if it's a NEW ORDER CONFIRMATION (not shipping updates, not marketing).
 
-IMPORTANT CLASSIFICATION RULES:
-- order_confirmation: New purchase order from a merchant (e.g., "Your order has been placed", "Order confirmation", "Thanks for your order")
-- NOT order_confirmation: Shipping updates, delivery notifications, marketing emails, password resets, newsletters
+## WHAT IS AN ORDER CONFIRMATION?
+✅ YES - order_confirmation:
+- "Your order has been placed"
+- "Order confirmation"
+- "Thanks for your order"
+- "Payment received"
+- "Receipt for your purchase"
 
-For order confirmations, extract all relevant information.
+❌ NO - NOT order_confirmation:
+- Shipping updates ("Your package is on the way")
+- Delivery notifications ("Your package was delivered")
+- Marketing emails ("Sale! 50% off")
+- Password resets
+- Newsletters
+- Account notifications
 
-Return ONLY valid JSON in this exact format:
-{
-  "is_order_confirmation": boolean,
-  "confidence": "high" | "medium" | "low",
-  "order_number": string | null,
-  "items": [
-    {
-      "name": string,
-      "price": number | null,
-      "quantity": number,
-      "category": string | null
-    }
-  ],
-  "merchant": string | null,
-  "order_date": "YYYY-MM-DD" | null,
-  "total_amount": number | null,
-  "currency": string | null,
-  "return_deadline": "YYYY-MM-DD" | null,
-  "warranty_months": number | null,
-  "tracking_number": string | null,
-  "estimated_delivery": "YYYY-MM-DD" | null
+## MERCHANT EXTRACTION (CRITICAL!)
+The merchant is the STORE that sold the product.
+- Look at the subject line: "Order from [MERCHANT]"
+- Look for store branding in the email
+- NEVER use email domains like gmail, outlook, yahoo as merchant
+- Examples: "Amazon", "Zara", "Apple", "IKEA", "Elkjøp"
+
+## COMMON SENSE RULES
+1. If email says "delivery in 3-5 days", calculate estimated_delivery from order date
+2. Norwegian online stores have 14-day "angrerett" (return right) by law
+3. Electronics usually have 12-24 month warranty
+4. Clothing usually has 30-day return, no warranty
+5. Parse Norwegian prices: "kr 1.234,56" = 1234.56 NOK
+
+## CURRENCY DETECTION
+- Norwegian: kr, NOK → "NOK"
+- Swedish: kr, SEK → "SEK"
+- Euro: €, EUR → "EUR"
+- US Dollar: $, USD → "USD"`
+
+// Tool definition for Claude structured extraction
+const GMAIL_EXTRACTION_TOOL: Anthropic.Tool = {
+  name: 'extract_order_data',
+  description: 'Extract structured order information from an email',
+  input_schema: {
+    type: 'object',
+    properties: {
+      is_order_confirmation: {
+        type: 'boolean',
+        description: 'True if this is a NEW order confirmation email'
+      },
+      confidence: {
+        type: 'string',
+        enum: ['high', 'medium', 'low'],
+        description: 'Confidence level of the extraction'
+      },
+      order_number: {
+        type: 'string',
+        description: 'Order/confirmation number'
+      },
+      items: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            price: { type: 'number' },
+            quantity: { type: 'number' },
+            category: { type: 'string' }
+          },
+          required: ['name', 'quantity']
+        },
+        description: 'List of items purchased'
+      },
+      merchant: {
+        type: 'string',
+        description: 'Store/brand name (NOT email provider like gmail)'
+      },
+      order_date: {
+        type: 'string',
+        description: 'Purchase date in YYYY-MM-DD format'
+      },
+      total_amount: {
+        type: 'number',
+        description: 'Total amount paid'
+      },
+      currency: {
+        type: 'string',
+        description: 'Currency code (NOK, USD, EUR, etc.)'
+      },
+      return_deadline: {
+        type: 'string',
+        description: 'Return deadline in YYYY-MM-DD format'
+      },
+      warranty_months: {
+        type: 'number',
+        description: 'Warranty period in months'
+      },
+      tracking_number: {
+        type: 'string',
+        description: 'Shipping tracking number if available'
+      },
+      estimated_delivery: {
+        type: 'string',
+        description: 'Estimated delivery date in YYYY-MM-DD format'
+      }
+    },
+    required: ['is_order_confirmation', 'confidence']
+  }
 }
-
-CATEGORY SUGGESTIONS:
-- "Electronics" for phones, computers, gadgets
-- "Clothing" for apparel, shoes, accessories
-- "Home" for furniture, home goods
-- "Food" for groceries, restaurants
-- "Travel" for flights, hotels, bookings
-- "Entertainment" for games, movies, subscriptions
-- "Health" for pharmacy, fitness
-- null if unclear
-
-WARRANTY ESTIMATION:
-- Electronics: 12-24 months
-- Appliances: 24 months
-- Clothing: 0 (no warranty, but has return period)
-- Furniture: 24 months
-- Default: 12 months if not specified
-
-RETURN DEADLINE ESTIMATION:
-- If return policy days are mentioned, calculate from order date
-- Common defaults: Clothing 30 days, Electronics 14-30 days
-- If no return policy found, leave as null`
 
 export async function analyzeEmailForOrder(
   subject: string,
   body: string,
   sender: string
 ): Promise<OrderExtractionResult> {
-  const openai = getOpenAI()
+  const anthropic = getAnthropicClient()
 
-  const emailContent = `
-From: ${sender}
+  // Don't include sender email domain - it confuses the AI
+  const senderName = sender.split('<')[0].trim() || sender.split('@')[0]
+
+  const emailContent = `Analyze this email:
+
 Subject: ${subject}
+From: ${senderName}
 
-${body.slice(0, 4000)}
-`
+${body.slice(0, 6000)}
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: ORDER_EXTRACTION_PROMPT },
-      { role: 'user', content: emailContent },
-    ],
-    max_tokens: 1000,
-    temperature: 0.1,
-  })
+Use the extract_order_data tool to return structured data.`
 
-  const content = completion.choices[0]?.message?.content || '{}'
-  
   try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as OrderExtractionResult
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 2048,
+      system: GMAIL_EXTRACTION_PROMPT,
+      tools: [GMAIL_EXTRACTION_TOOL],
+      tool_choice: { type: 'tool', name: 'extract_order_data' },
+      messages: [{ role: 'user', content: emailContent }]
+    })
+
+    // Extract tool use result
+    const toolUse = response.content.find(
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+    )
+
+    if (toolUse && toolUse.name === 'extract_order_data') {
+      const result = toolUse.input as any
+      return {
+        is_order_confirmation: result.is_order_confirmation ?? false,
+        confidence: result.confidence || 'low',
+        order_number: result.order_number || null,
+        items: result.items || [],
+        merchant: result.merchant || null,
+        order_date: result.order_date || null,
+        total_amount: result.total_amount || null,
+        currency: result.currency || null,
+        return_deadline: result.return_deadline || null,
+        warranty_months: result.warranty_months || null,
+        tracking_number: result.tracking_number || null,
+        estimated_delivery: result.estimated_delivery || null,
+      }
     }
-  } catch {
-    console.error('Failed to parse AI response:', content)
+  } catch (error) {
+    console.error('Claude extraction error:', error)
   }
 
   return {
