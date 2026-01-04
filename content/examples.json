@@ -1,0 +1,73 @@
+{
+  "categories": [
+    { "id": "all", "label": "All" },
+    { "id": "electronics", "label": "Electronics" },
+    { "id": "appliances", "label": "Appliances" },
+    { "id": "clothing", "label": "Clothing" },
+    { "id": "home", "label": "Home" },
+    { "id": "auto", "label": "Auto" }
+  ],
+  "examples": [
+    {
+      "id": "1",
+      "category": "electronics",
+      "merchant": "Apple Store",
+      "item": "MacBook Pro 14\"",
+      "price": "$1,999",
+      "warranty": "12 months",
+      "date": "2024-12-15",
+      "confidence": 98
+    },
+    {
+      "id": "2",
+      "category": "electronics",
+      "merchant": "Best Buy",
+      "item": "Sony WH-1000XM5",
+      "price": "$349",
+      "warranty": "12 months",
+      "date": "2024-11-20",
+      "confidence": 95
+    },
+    {
+      "id": "3",
+      "category": "appliances",
+      "merchant": "Home Depot",
+      "item": "LG Refrigerator",
+      "price": "$1,299",
+      "warranty": "24 months",
+      "date": "2024-10-05",
+      "confidence": 92
+    },
+    {
+      "id": "4",
+      "category": "clothing",
+      "merchant": "Zara",
+      "item": "Winter Jacket",
+      "price": "$149",
+      "warranty": "0 months",
+      "date": "2024-12-01",
+      "confidence": 88,
+      "returnDays": 30
+    },
+    {
+      "id": "5",
+      "category": "home",
+      "merchant": "IKEA",
+      "item": "MALM Dresser",
+      "price": "$199",
+      "warranty": "10 years",
+      "date": "2024-09-15",
+      "confidence": 91
+    },
+    {
+      "id": "6",
+      "category": "auto",
+      "merchant": "AutoZone",
+      "item": "Car Battery",
+      "price": "$189",
+      "warranty": "36 months",
+      "date": "2024-08-22",
+      "confidence": 94
+    }
+  ]
+}

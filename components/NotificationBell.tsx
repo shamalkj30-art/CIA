@@ -6,9 +6,10 @@ import type { Notification, NotificationSettings } from '@/lib/types'
 
 interface NotificationBellProps {
   variant?: 'icon' | 'sidebar'
+  collapsed?: boolean
 }
 
-export default function NotificationBell({ variant = 'icon' }: NotificationBellProps) {
+export default function NotificationBell({ variant = 'icon', collapsed = false }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
@@ -410,17 +411,20 @@ export default function NotificationBell({ variant = 'icon' }: NotificationBellP
   // Sidebar variant - full width nav item style
   if (variant === 'sidebar') {
     return (
-      <div className="relative" ref={dropdownRef}>
+      <div className="relative group" ref={dropdownRef}>
         <button
           ref={buttonRef}
           onClick={handleToggle}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            collapsed ? 'justify-center' : ''
+          } ${
             isOpen
               ? 'bg-[var(--primary)] text-white shadow-md'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
           }`}
+          title={collapsed ? 'Notifications' : undefined}
         >
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
@@ -430,20 +434,39 @@ export default function NotificationBell({ variant = 'icon' }: NotificationBellP
               </span>
             )}
           </div>
-          <span className="flex-1 text-left">Notifications</span>
-          {unreadCount > 0 && (
-            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-              isOpen ? 'bg-white/20 text-white' : 'bg-[var(--primary-soft)] text-[var(--primary)]'
-            }`}>
-              {unreadCount}
-            </span>
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left truncate">Notifications</span>
+              {unreadCount > 0 && (
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                  isOpen ? 'bg-white/20 text-white' : 'bg-[var(--primary-soft)] text-[var(--primary)]'
+                }`}>
+                  {unreadCount}
+                </span>
+              )}
+            </>
           )}
         </button>
 
-        {/* Dropdown - positioned above for sidebar */}
+        {/* Tooltip for collapsed state */}
+        {collapsed && !isOpen && (
+          <div className="
+            absolute left-full ml-2 px-2 py-1 bg-[var(--text-primary)] text-[var(--background)]
+            text-xs font-medium rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible
+            transition-all whitespace-nowrap z-50 pointer-events-none top-1/2 -translate-y-1/2
+          ">
+            Notifications {unreadCount > 0 && `(${unreadCount})`}
+          </div>
+        )}
+
+        {/* Dropdown - positioned to the right for collapsed, below for expanded */}
         {isOpen && (
-          <div className={`absolute left-0 w-80 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] z-50 overflow-hidden ${
-            dropdownPosition === 'above' ? 'bottom-full mb-2' : 'top-full mt-2'
+          <div className={`absolute w-80 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] z-50 overflow-hidden ${
+            collapsed
+              ? 'left-full ml-2 top-0'
+              : dropdownPosition === 'above'
+                ? 'left-0 bottom-full mb-2'
+                : 'left-0 top-full mt-2'
           }`}>
             {renderDropdownContent()}
           </div>

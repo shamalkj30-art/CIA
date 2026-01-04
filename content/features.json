@@ -1,0 +1,56 @@
+{
+  "hero": {
+    "badge": "Warranty Management",
+    "headline": "Never lose another warranty claim",
+    "subheadline": "Upload receipts. Track warranties. Generate claim packets. Cyncro uses AI to extract purchase details and reminds you before coverage expires."
+  },
+  "howItWorks": {
+    "headline": "How Cyncro works",
+    "steps": [
+      {
+        "step": "01",
+        "title": "Upload or forward",
+        "description": "Drop a photo of your receipt, forward email confirmations, or import PDFs. Our AI reads them instantly.",
+        "icon": "upload"
+      },
+      {
+        "step": "02",
+        "title": "AI extracts details",
+        "description": "We automatically pull out merchant, item, price, and warranty length. Review and confirm with one tap.",
+        "icon": "sparkles"
+      },
+      {
+        "step": "03",
+        "title": "Track & get reminded",
+        "description": "See all your warranties in one place. Get notified before they expire so you never miss a claim window.",
+        "icon": "bell"
+      }
+    ]
+  },
+  "claimPacket": {
+    "headline": "One-click claim packets",
+    "description": "When you need to file a warranty claim, Cyncro generates a complete packet with your original receipt, purchase details, and warranty terms. Download as PDF or share directly with the merchant.",
+    "features": [
+      "Original receipt image",
+      "Extracted purchase details",
+      "Warranty terms & conditions",
+      "Shareable PDF format"
+    ]
+  },
+  "integrations": [
+    { "name": "Gmail", "icon": "gmail" },
+    { "name": "Outlook", "icon": "outlook", "comingSoon": true },
+    { "name": "Apple Wallet", "icon": "apple", "comingSoon": true },
+    { "name": "Google Drive", "icon": "drive", "comingSoon": true }
+  ],
+  "security": {
+    "headline": "Bank-level security",
+    "description": "Your data is encrypted at rest and in transit. We never sell your information, and you can delete everything at any time."
+  },
+  "finalCta": {
+    "headline": "Ready to protect your purchases?",
+    "description": "Join thousands of people who never miss a warranty claim. Start free, upgrade when you need more.",
+    "primaryCta": "Start free",
+    "secondaryCta": "See pricing"
+  }
+}

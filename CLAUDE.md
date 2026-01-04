@@ -36,7 +36,9 @@ Cyncro is an **AI-powered warranty and order management app**. Users connect the
 
 ```
 app/
+  (marketing)/     # Public marketing pages (landing, pricing, security, examples)
   (app)/           # Authenticated routes (dashboard, settings, purchases)
+  (auth)/          # Login/signup
   api/
     ai/analyze-receipt/   # Manual receipt upload AI analysis
     auth/google/          # Gmail OAuth flow
@@ -44,6 +46,11 @@ app/
     gmail/sync/           # Gmail sync endpoint
     cron/check-expiries/  # Daily cron for notifications
     purchases/            # CRUD for purchases
+components/
+  ui/              # Design system primitives (Card, Button, Badge, Tabs, Dialog, etc.)
+  app/             # App shell components (AppSidebar, CommandPalette, QuickAddMenu)
+  marketing/       # Marketing components (MarketingHeader, Footer, HeroInteractive)
+content/           # Content model JSON files (examples, pricing, features)
 lib/
   gmail.ts         # Gmail API + AI extraction (uses Claude)
   ai-extraction.ts # Email forwarding AI extraction (uses Claude)
@@ -83,12 +90,20 @@ Required in `.env.local`:
 - ✅ Dark/light mode
 
 ### Recent Changes:
-1. **Gmail sync now uses Anthropic Claude** (was OpenAI)
-2. **Email forwarding improved** - strips forwarding headers, extracts merchant from subject
-3. **Validation fixed** - no more "merchant cannot be email provider" loops
+1. **Complete UI redesign** (Jan 2026) - Premium design system inspired by aura.build
+   - New design system with primitives in `/components/ui/`
+   - Collapsible sidebar with keyboard shortcuts (Cmd+B)
+   - Command palette for quick search (Cmd+K)
+   - Rebuilt marketing site with unique section layouts
+   - New dashboard with Attention Queue, Recent Captures
+   - Content model in `/content/` for easy updates
+2. **Gmail sync now uses Anthropic Claude** (was OpenAI)
+3. **Email forwarding improved** - strips forwarding headers, extracts merchant from subject
+4. **Validation fixed** - no more "merchant cannot be email provider" loops
 
 ### Known Issues / TODO:
 - Email forwarding via Resend is less reliable than Gmail API (forwarded emails lose original sender info)
+- **Gmail OAuth blocked** - App is in Google "Testing" mode. Needs OAuth consent screen verification to go live (requires privacy policy, verification process). Code is ready in `lib/gmail.ts`.
 - Gmail sync is manual (user clicks "Sync Now") - could add push notifications for real-time
 
 ## Important Quirks

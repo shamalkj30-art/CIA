@@ -6,9 +6,15 @@ import type { OrderExtractionResult } from './types'
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!
-const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
-  ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`
-  : 'http://localhost:3000/api/auth/google/callback'
+
+// Ensure no trailing slash and consistent format
+function getRedirectUri() {
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
+  const uri = `${baseUrl}/api/auth/google/callback`
+  console.log('[Gmail OAuth] Using redirect URI:', uri)
+  return uri
+}
+const GOOGLE_REDIRECT_URI = getRedirectUri()
 
 // Scopes needed for Gmail read access
 const SCOPES = [
