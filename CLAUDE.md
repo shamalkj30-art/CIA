@@ -37,7 +37,7 @@ Cyncro is an **AI-powered warranty and order management app**. Users connect the
 ```
 app/
   (marketing)/     # Public marketing pages (landing, pricing, security, examples)
-  (app)/           # Authenticated routes (dashboard, settings, purchases)
+  (app)/           # Authenticated routes (dashboard, settings, purchases, notifications, upload)
   (auth)/          # Login/signup
   api/
     ai/analyze-receipt/   # Manual receipt upload AI analysis
@@ -88,6 +88,8 @@ Required in `.env.local`:
 - ✅ Purchase CRUD
 - ✅ Warranty/return tracking
 - ✅ Dark/light mode
+- ✅ Notifications page with settings
+- ✅ List/grid view toggle on Purchases
 
 ### Recent Changes:
 1. **Complete UI redesign** (Jan 2026) - Premium design system inspired by aura.build
@@ -100,6 +102,17 @@ Required in `.env.local`:
 2. **Gmail sync now uses Anthropic Claude** (was OpenAI)
 3. **Email forwarding improved** - strips forwarding headers, extracts merchant from subject
 4. **Validation fixed** - no more "merchant cannot be email provider" loops
+5. **Notifications redesign** (Jan 4, 2026)
+   - Moved from popup to dedicated page at `/app/(app)/notifications/page.tsx`
+   - Added to main sidebar navigation (under Purchases)
+   - Two-column layout: notifications list + settings panel
+   - Custom dropdown components for day selection (replacing native selects)
+   - Toggle switches for notification types (warranty expiring, return deadline, new purchase)
+6. **Purchases page enhancements** (Jan 4, 2026)
+   - Added list/grid view toggle (icons next to sort dropdown)
+   - Grid view shows cards similar to Examples page (2-3 columns)
+   - List view remains the default with checkboxes for multi-select
+7. **Upload page fix** - Price input padding corrected ($ sign no longer overlaps value)
 
 ### Known Issues / TODO:
 - Email forwarding via Resend is less reliable than Gmail API (forwarded emails lose original sender info)
