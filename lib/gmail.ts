@@ -445,12 +445,16 @@ export async function syncGmailEmails(userId: string) {
       errors.push(error.message)
       
       // Mark as failed
-      await supabase.from('processed_emails').insert({
-        user_id: userId,
-        email_id: messageId,
-        result: 'failed',
-        error_message: error.message,
-      }).catch(() => {})
+      try {
+        await supabase.from('processed_emails').insert({
+          user_id: userId,
+          email_id: messageId,
+          result: 'failed',
+          error_message: error.message,
+        })
+      } catch {
+        // Ignore insert errors
+      }
     }
   }
 
