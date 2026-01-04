@@ -18,6 +18,7 @@ interface ExtractionOptions {
   hasAttachment: boolean
   attachmentType?: string | null
   maxRetries?: number
+  merchantHint?: string | null // Pre-extracted merchant hint from subject line
 }
 
 interface ExtractionResult {
@@ -28,112 +29,86 @@ interface ExtractionResult {
 }
 
 /**
- * System prompt for email extraction
+ * System prompt for email extraction - Improved for common sense extraction
  */
-const SYSTEM_PROMPT = `You are an expert multilingual email analyzer specializing in Nordic e-commerce order confirmations and receipts.
+const SYSTEM_PROMPT = `You are an expert email analyzer that extracts purchase information with COMMON SENSE reasoning.
 
-Your task is to extract structured purchase information from emails with MAXIMUM accuracy.
+## YOUR #1 PRIORITY: CORRECT MERCHANT NAME
+The merchant is the STORE/COMPANY that SOLD the product. This is CRITICAL.
+
+### SUBJECT LINE IS YOUR BEST FRIEND
+The subject line almost ALWAYS contains the merchant name. Examples:
+- "Your receipt from Anthropic, PBC #123" → Merchant: "Anthropic"
+- "Fwd: Order confirmation - Zara" → Merchant: "Zara"
+- "Receipt from Apple Store" → Merchant: "Apple"
+- "Takk for kjøpet hos Elkjøp" → Merchant: "Elkjøp"
+
+### ABSOLUTE RULES FOR MERCHANT:
+1. ✅ ALWAYS check the subject line FIRST - it usually has the store name
+2. ✅ Look for "from [Store]", "[Store] - Order", "Thank you for shopping at [Store]"
+3. ✅ Company names like "Anthropic, PBC", "Apple Inc", "ZARA NORGE AS" are merchants
+4. ❌ NEVER use email providers: gmail, outlook, yahoo, hotmail, icloud
+5. ❌ NEVER use generic terms: email, mail, receipt, order, unknown
+6. ❌ NEVER use the forwarding user's email domain
+
+### IF MERCHANT HINT IS PROVIDED, USE IT!
+If the context provides a "Merchant hint from subject:", TRUST IT and use that as the merchant name.
+
+## COMMON SENSE RULES (USE YOUR BRAIN!)
+
+### Delivery Estimates
+- "Delivery in 3-5 days" with order date Jan 4 → estimated_delivery_date = "2025-01-09" (use middle value)
+- "Ships within 1-2 business days" → Add 4-5 days for delivery
+- "Express shipping (1 day)" → estimated_delivery_date = order date + 1
+
+### Return Policies
+- Most clothing stores: 14-30 days (default to 14 if not specified for apparel)
+- Electronics: Usually 14-30 days open box
+- "Angrerett" (Norwegian) = 14 days by law for online purchases
+- If email mentions "full refund within X days", use X
+
+### Warranty
+- Electronics: Usually 12-24 months
+- Appliances: Usually 24 months
+- Software/digital: Usually 0 (no warranty)
+- "Reklamasjonsrett" (Norwegian) = 2-5 years depending on product lifespan
+
+### Currency Detection
+- Norwegian stores (Elkjøp, Komplett, CDON.no): NOK
+- Swedish stores (IKEA SE, Boozt): SEK
+- Euro zone stores: EUR
+- US stores: USD
+- Look for kr, NOK, $, €, £ symbols
 
 ## LANGUAGE DETECTION
-Detect the primary language of the email:
-- Norwegian (no): "Takk for kjøpet", "bestilling", "ordrenummer", "kr", "NOK", "angrerett", "dager"
-- English (en): "Thank you", "order", "purchase", "confirmation", "total"
-- Swedish (sv): "Tack för", "beställning", "ordernummer", "kronor"
-- Danish (da): "Tak for", "bestilling", "bekræftelse"
-- German (de): "Danke", "Bestellung", "Rechnung"
-- Other: If none of the above match
+- Norwegian (no): "Takk for", "bestilling", "kvittering", "kr", "NOK"
+- English (en): "Thank you", "order", "receipt", "total"
+- Swedish (sv): "Tack för", "beställning", "kronor"
+- Danish (da): "Tak for", "ordre"
+- German (de): "Danke", "Bestellung"
 
-## EMAIL TYPE CLASSIFICATION
-Classify the email into ONE of these types:
-- order_confirmation: Order placed, items confirmed, payment confirmed ("Order confirmed", "Takk for kjøpet", "Bestellbestätigung")
-- payment_receipt: Payment processed ("Payment accepted", "Receipt", "Kvittering")
-- shipping_confirmation: Order shipped/dispatched ("Shipped", "On its way", "Sendt", "Försändelse")
-- delivery_confirmation: Order delivered ("Delivered", "Levert")
-- invoice: Invoice document ("Invoice", "Faktura", "Rechnung")
-- thank_you: Generic thank you without details ("Thank you for shopping")
-- unknown: Cannot determine type
+## EMAIL TYPE
+- order_confirmation: "Order confirmed", "Takk for kjøpet"
+- payment_receipt: "Payment received", "Kvittering"
+- shipping_confirmation: "Shipped", "Sendt", "On its way"
+- delivery_confirmation: "Delivered", "Levert"
+- invoice: "Invoice", "Faktura"
+- thank_you: Generic thank you without order details
+- unknown: Cannot determine
 
-## MERCHANT EXTRACTION (CRITICAL)
-The merchant is the STORE/BRAND that sold the product, NOT the email provider.
+## AMOUNT EXTRACTION
+Find the TOTAL amount (not subtotals or individual items):
+- European format: "1.234,56" = 1234.56
+- US format: "1,234.56" = 1234.56
+- Norwegian: "kr 1 234" = 1234 NOK
 
-CORRECT merchant names:
-- "Zara" (clothing retailer)
-- "Mango" (clothing retailer)
-- "Lumibeauty" (beauty products)
-- "Elkjøp" (electronics)
-- "IKEA" (furniture)
+## CONFIDENCE LEVELS
+- high: Found merchant in subject + total amount + date clearly
+- medium: Found most fields but some uncertainty
+- low: Significant guessing required
 
-NEVER use these as merchant names:
-- ❌ "gmail", "outlook", "hotmail", "yahoo" (email providers)
-- ❌ "email", "mail", "post" (generic terms)
-- ❌ "unknown" (unless you genuinely cannot find ANY merchant indicator)
-
-How to find the merchant:
-1. Look for brand names in the email header/logo
-2. Check the email subject line for store names
-3. Look for phrases like "Thank you for shopping with [Brand]"
-4. Check sender display name (but NOT the email domain)
-5. Look for website URLs (zara.com → "Zara")
-
-## AMOUNT & CURRENCY EXTRACTION (CRITICAL)
-Locate the FINAL TOTAL amount paid by the customer.
-
-Common table headers/labels to look for:
-- Norwegian: "Totalt", "Sum", "Til sammen", "Delsum", "Beløp"
-- English: "Total", "Amount", "Grand Total", "Order Total"
-- Swedish: "Totalt", "Summa"
-- German: "Gesamt", "Summe"
-
-Currency formats to handle:
-- Norwegian: "kr 1.217,00" or "1 217 kr" or "1.217,00 NOK" → 1217.00 NOK
-- European: "86,98 €" or "EUR 86,98" → 86.98 EUR
-- US: "$1,234.56" or "1234.56 USD" → 1234.56 USD
-- Generic: "1,435.00 NOK" → 1435.00 NOK
-
-IMPORTANT number format rules:
-- European format uses COMMA for decimals: "1.217,00" = 1217.00
-- US format uses DOT for decimals: "1,217.00" = 1217.00
-- Spaces can be thousands separators: "1 217" = 1217
-
-Extract the LARGEST amount labeled as "total", not individual item prices.
-
-## RETURN POLICY EXTRACTION
-Look for return/exchange deadlines:
-- Norwegian: "14 dager", "30 dagers angrerett", "retur innen"
-- English: "14 days to return", "30-day return policy"
-- Swedish: "14 dagars returrätt"
-- Common values: 14, 30, 60, 90 days
-
-## WARRANTY EXTRACTION
-Most order confirmations DON'T include warranty info - that's normal.
-Only set warranty_months if explicitly mentioned:
-- "2 år garanti" → 24 months
-- "1 year warranty" → 12 months
-- If not mentioned → 0 months
-
-## CONFIDENCE SCORING
-Score each field 0.0 to 1.0:
-- merchant: 1.0 = certain (saw logo/brand name), 0.5 = guessed from context, 0.2 = very uncertain
-- amount: 1.0 = found in "Total" row, 0.7 = found number but no label, 0.3 = guessed
-- date: 1.0 = explicit date in email, 0.8 = inferred from email timestamp
-- email_type: 1.0 = clear indicator, 0.5 = ambiguous
-
-Overall confidence:
-- high: All critical fields found with certainty
-- medium: Some fields uncertain or missing
-- low: Significant gaps or uncertainty
-
-## ANTI-HALLUCINATION RULES
-1. If you cannot find a field, set it to null - NEVER guess
-2. If you cannot determine email type, use "unknown"
-3. If merchant is unclear, provide your best guess but set low confidence
-4. Never invent order numbers, tracking numbers, or amounts
-5. If multiple possible amounts, choose the one labeled "total" or the largest
-
-## OUTPUT REQUIREMENTS
-Always return complete, valid JSON matching the schema.
-Set needs_review: true if confidence is low or critical fields are missing.
-Provide brief extraction_notes explaining your reasoning for uncertain fields.`
+## CRITICAL: NEVER RETURN EMAIL PROVIDER AS MERCHANT
+If you're about to return "gmail", "yahoo", "outlook", etc as merchant_name, STOP and re-read the subject line.`
 
 /**
  * Tool definition for Anthropic structured output
@@ -262,7 +237,7 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
 export async function extractOrderData(
   options: ExtractionOptions
 ): Promise<ExtractionResult> {
-  const { emailContent, subject, hasAttachment, attachmentType, maxRetries = 2 } = options
+  const { emailContent, subject, hasAttachment, attachmentType, maxRetries = 2, merchantHint } = options
 
   // Initialize Anthropic client
   const anthropic = new Anthropic({
@@ -277,17 +252,29 @@ export async function extractOrderData(
   const amounts = extractAllAmounts(emailContent)
   const possibleTotal = findTotalAmount(emailContent, amounts)
 
+  // Build context hints with merchant hint prominently displayed
   const contextHints = `
-CONTEXT HINTS (to help you):
+=== IMPORTANT CONTEXT ===
+${merchantHint ? `🏪 MERCHANT HINT FROM SUBJECT: "${merchantHint}" - USE THIS AS THE MERCHANT NAME!` : ''}
 - Detected language: ${detectedLanguage}
 ${possibleTotal ? `- Possible total found: ${possibleTotal.raw} (${possibleTotal.amount} ${possibleTotal.currency || 'unknown currency'})` : ''}
 ${amounts.length > 0 ? `- Found ${amounts.length} currency amounts in email` : ''}
 ${hasAttachment ? `- Email has attachment: ${attachmentType || 'unknown type'}` : '- No attachments'}
+=== END CONTEXT ===
 `
 
   while (retries <= maxRetries) {
     try {
-      const userPrompt = `${retries > 0 ? '⚠️ RETRY ' + retries + ': Previous extraction had validation errors. Be more careful.\n\n' : ''}Extract purchase information from this email:
+      const retryWarning = retries > 0
+        ? `⚠️ RETRY ${retries}: Previous extraction failed. The merchant was probably wrong.
+REMEMBER: The merchant is the STORE that sold the item, NOT gmail/outlook/yahoo!
+Look at the subject line: "${subject}" - the store name is usually there.
+${merchantHint ? `USE THIS MERCHANT: "${merchantHint}"` : ''}
+
+`
+        : ''
+
+      const userPrompt = `${retryWarning}Extract purchase information from this email:
 
 Subject: ${subject}
 
@@ -322,13 +309,33 @@ Use the extract_order_data tool to return structured data.`
 
       const extraction = toolUse.input as any
 
-      // Post-process: Validate and normalize currency
+      // Post-process: Fix common AI mistakes
+
+      // 1. If AI returned email provider as merchant, override with hint
+      const emailProviders = ['gmail', 'outlook', 'yahoo', 'hotmail', 'icloud', 'live', 'mail', 'email', 'unknown']
+      const merchantLower = (extraction.merchant_name || '').toLowerCase()
+      if (emailProviders.some(p => merchantLower.includes(p))) {
+        if (merchantHint) {
+          console.log(`🔧 Overriding bad merchant "${extraction.merchant_name}" with hint "${merchantHint}"`)
+          extraction.merchant_name = merchantHint
+          extraction.extraction_notes = (extraction.extraction_notes || '') + ` [Auto-corrected merchant from subject line]`
+          extraction.needs_review = true
+        }
+      }
+
+      // 2. Validate and normalize currency
       if (extraction.total_amount && !extraction.currency && detectedLanguage) {
         extraction.currency = inferCurrency(detectedLanguage, emailContent)
       }
 
-      // Validate with Zod
-      const validation = validateExtraction(extraction, retries > 0)
+      // 3. If we still have no good merchant but have a hint, use it
+      if ((!extraction.merchant_name || extraction.merchant_name.length < 2) && merchantHint) {
+        extraction.merchant_name = merchantHint
+        extraction.needs_review = true
+      }
+
+      // Validate with Zod - NEVER use strict mode (it causes loops)
+      const validation = validateExtraction(extraction, false)
 
       if (!validation.success) {
         lastError = `Validation failed: ${validation.errors?.issues.map(i => i.message).join(', ')}`

@@ -128,32 +128,24 @@ export const OrderExtractionSchema = z.object({
 export type OrderExtraction = z.infer<typeof OrderExtractionSchema>
 
 /**
- * Strict schema for retry - requires high-confidence fields
+ * Strict schema - DEPRECATED, kept for backwards compatibility
+ * Using strict mode caused retry loops, so we now always use the base schema
  */
-export const StrictOrderExtractionSchema = OrderExtractionSchema.extend({
-  merchant_name: z.string().min(2).refine(
-    (val) => !['gmail', 'outlook', 'yahoo', 'hotmail', 'email', 'unknown'].includes(val.toLowerCase()),
-    { message: 'Merchant name cannot be an email provider' }
-  ),
-  confidence: ConfidenceScoresSchema.refine(
-    (val) => val.overall === 'high' || val.overall === 'medium',
-    { message: 'Confidence must be at least medium for strict validation' }
-  )
-})
+export const StrictOrderExtractionSchema = OrderExtractionSchema
 
 export type StrictOrderExtraction = z.infer<typeof StrictOrderExtractionSchema>
 
 /**
  * Validates extraction result
+ * Note: strict parameter is ignored - always uses base schema
  */
-export function validateExtraction(data: unknown, strict: boolean = false): {
+export function validateExtraction(data: unknown, _strict: boolean = false): {
   success: boolean
-  data?: OrderExtraction | StrictOrderExtraction
+  data?: OrderExtraction
   errors?: z.ZodError
 } {
-  const schema = strict ? StrictOrderExtractionSchema : OrderExtractionSchema
-
-  const result = schema.safeParse(data)
+  // Always use base schema - strict mode caused infinite retry loops
+  const result = OrderExtractionSchema.safeParse(data)
 
   if (result.success) {
     return { success: true, data: result.data }

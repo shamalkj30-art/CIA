@@ -5,7 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { parseEmailHtml, detectEmailLanguage } from '@/lib/email-parser'
+import { parseEmailHtml, detectEmailLanguage, stripForwardingHeaders, extractMerchantFromSubject, extractMerchantFromSenderDomain } from '@/lib/email-parser'
 import { extractOrderData } from '@/lib/ai-extraction'
 import { isPurchaseEmail } from '@/lib/email-schemas'
 import { extractTextFromAttachment } from '@/lib/pdf-extractor'
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Parse HTML to structured text (preserves tables!)
     const parsed = parseEmailHtml(htmlBody)
-    const emailText = textBody || parsed.text
+    let emailText = textBody || parsed.text
 
     console.log('📄 Parsed email:', {
       textLength: emailText.length,
@@ -145,7 +145,19 @@ export async function POST(request: NextRequest) {
       tablesCount: parsed.extractedTables.length
     })
 
-    // Step 2: Extract PDF text if invoice attached
+    // Step 2: Strip forwarding headers to prevent "gmail" merchant bug
+    emailText = stripForwardingHeaders(emailText)
+    console.log('🧹 After stripping forwarding headers:', emailText.length, 'chars')
+
+    // Step 3: Extract merchant hints from subject and original sender
+    const subjectMerchantHint = extractMerchantFromSubject(subject)
+    // Note: 'from' here is the forwarding user's email, not the original store
+    // We'd need to parse the forwarded headers to get original sender
+    // For now, extract from subject which is more reliable
+
+    console.log('🏪 Merchant hint from subject:', subjectMerchantHint || 'none')
+
+    // Step 4: Extract PDF text if invoice attached
     let pdfText: string | null = null
     const pdfAttachment = attachments.find((att: any) => {
       const type = att.content_type || att.contentType || att.type || ''
@@ -157,18 +169,19 @@ export async function POST(request: NextRequest) {
       pdfText = await extractTextFromAttachment(pdfAttachment)
       if (pdfText) {
         console.log('✅ PDF text extracted:', pdfText.length, 'chars')
+        // Also strip forwarding artifacts from PDF text
+        pdfText = stripForwardingHeaders(pdfText)
       }
     }
 
-    // Step 3: Combine email text + PDF text (if available)
-    // CRITICAL FIX: DO NOT include "From: <email>" - that caused the "gmail" bug!
+    // Step 5: Combine email text + PDF text (if available)
     const fullContent = `
 ${pdfText ? '=== PDF INVOICE ===\n' + pdfText + '\n=== END PDF ===\n\n' : ''}${emailText}
     `.trim()
 
     console.log('📋 Full content length:', fullContent.length)
 
-    // Step 4: Quick language detection
+    // Step 6: Quick language detection
     const detectedLang = detectEmailLanguage(fullContent)
     console.log('🌍 Detected language:', detectedLang)
 
@@ -181,7 +194,8 @@ ${pdfText ? '=== PDF INVOICE ===\n' + pdfText + '\n=== END PDF ===\n\n' : ''}${e
       subject: subject,
       hasAttachment: attachments.length > 0,
       attachmentType: pdfAttachment?.content_type || null,
-      maxRetries: 2 // Will retry once on validation failure
+      maxRetries: 2, // Will retry once on validation failure
+      merchantHint: subjectMerchantHint // Pass the hint to AI
     })
 
     if (!extractionResult.success || !extractionResult.data) {

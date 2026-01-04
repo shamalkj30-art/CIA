@@ -177,6 +177,142 @@ export function extractAmountsFromText(text: string): Array<{
 }
 
 /**
+ * Strips forwarding headers from email content to prevent AI confusion
+ * These headers often contain email domains like "gmail.com" that confuse merchant extraction
+ */
+export function stripForwardingHeaders(text: string): string {
+  let cleaned = text
+
+  // Remove Gmail/Outlook forwarding headers
+  cleaned = cleaned.replace(/---------- Forwarded message ---------[\s\S]*?Subject:.*?\n/gi, '')
+  cleaned = cleaned.replace(/-------- Original Message --------[\s\S]*?Subject:.*?\n/gi, '')
+  cleaned = cleaned.replace(/Begin forwarded message:[\s\S]*?Subject:.*?\n/gi, '')
+
+  // Remove "From:" lines that contain email addresses (these confuse the AI)
+  cleaned = cleaned.replace(/^From:\s*.*@.*$/gm, '')
+  cleaned = cleaned.replace(/Fra:\s*.*@.*$/gm, '') // Norwegian
+
+  // Remove "To:" lines with email addresses
+  cleaned = cleaned.replace(/^To:\s*.*@.*$/gm, '')
+  cleaned = cleaned.replace(/Til:\s*.*@.*$/gm, '') // Norwegian
+
+  // Remove "Sent:" / "Date:" lines
+  cleaned = cleaned.replace(/^Sent:\s*.*$/gm, '')
+  cleaned = cleaned.replace(/^Date:\s*.*$/gm, '')
+
+  // Remove email addresses that might appear inline (but keep the context)
+  // Be careful not to remove store emails that might be useful
+  cleaned = cleaned.replace(/\b[A-Za-z0-9._%+-]+@(gmail|outlook|hotmail|yahoo|icloud|live)\.(com|no|se|dk|net|org)\b/gi, '[email removed]')
+
+  // Clean up excessive whitespace
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim()
+
+  return cleaned
+}
+
+/**
+ * Extracts merchant name hints from email subject line
+ * Subjects often contain patterns like "Your order from [Store]" or "Receipt from [Store]"
+ */
+export function extractMerchantFromSubject(subject: string): string | null {
+  if (!subject) return null
+
+  // Remove "Fwd:", "Re:", "Fw:" prefixes
+  let cleaned = subject.replace(/^(Fwd?|Re|Fw):\s*/gi, '').trim()
+
+  // Common patterns in subjects
+  const patterns = [
+    // "Your receipt from Anthropic, PBC #123" → "Anthropic, PBC"
+    /(?:receipt|order|confirmation|kvittering|bestilling|bekreftelse)\s+from\s+([^#\d][^#]*?)(?:\s*#|\s*$)/i,
+    // "Order Confirmation - Store Name" → "Store Name"
+    /(?:order|purchase|receipt)\s+confirmation\s*[-–:]\s*(.+?)(?:\s*#|\s*$)/i,
+    // "Takk for kjøpet hos Store Name" → "Store Name"
+    /(?:takk for|tack för|tak for)\s+(?:kjøpet|köpet|købet)\s+(?:hos|från|fra)\s+(.+?)(?:\s*#|\s*$)/i,
+    // "Store Name - Order Confirmation" → "Store Name"
+    /^([^-–]+?)\s*[-–]\s*(?:order|receipt|confirmation|kvittering)/i,
+    // "Your Store Name order" → "Store Name"
+    /your\s+(.+?)\s+order/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = cleaned.match(pattern)
+    if (match && match[1]) {
+      const merchant = match[1].trim()
+      // Filter out generic words
+      if (!['your', 'my', 'the', 'a', 'an', 'order', 'receipt'].includes(merchant.toLowerCase())) {
+        return merchant
+      }
+    }
+  }
+
+  return null
+}
+
+/**
+ * Known merchant domains and their brand names
+ */
+const KNOWN_MERCHANTS: Record<string, string> = {
+  'anthropic.com': 'Anthropic',
+  'zara.com': 'Zara',
+  'hm.com': 'H&M',
+  'mango.com': 'Mango',
+  'elkjop.no': 'Elkjøp',
+  'komplett.no': 'Komplett',
+  'amazon.com': 'Amazon',
+  'apple.com': 'Apple',
+  'netflix.com': 'Netflix',
+  'spotify.com': 'Spotify',
+  'ikea.com': 'IKEA',
+  'cdon.no': 'CDON',
+  'nelly.com': 'Nelly',
+  'boozt.com': 'Boozt',
+  'zalando.no': 'Zalando',
+  'lumibeauty.no': 'Lumibeauty',
+}
+
+/**
+ * Extracts merchant from sender email domain if it's a known store
+ */
+export function extractMerchantFromSenderDomain(fromEmail: string): string | null {
+  if (!fromEmail) return null
+
+  const domainMatch = fromEmail.match(/@([a-zA-Z0-9.-]+)$/i)
+  if (!domainMatch) return null
+
+  const domain = domainMatch[1].toLowerCase()
+
+  // Check known merchants
+  for (const [merchantDomain, merchantName] of Object.entries(KNOWN_MERCHANTS)) {
+    if (domain.includes(merchantDomain.split('.')[0])) {
+      return merchantName
+    }
+  }
+
+  // Skip email providers
+  const emailProviders = ['gmail', 'outlook', 'hotmail', 'yahoo', 'icloud', 'live', 'mail', 'proton']
+  for (const provider of emailProviders) {
+    if (domain.includes(provider)) {
+      return null
+    }
+  }
+
+  // For unknown domains, extract the brand name from domain
+  // e.g., "noreply@store-name.com" → "Store Name"
+  const baseDomain = domain.split('.')[0]
+  if (baseDomain.length > 2) {
+    // Convert "store-name" to "Store Name"
+    const brandName = baseDomain
+      .replace(/[-_]/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+    return brandName
+  }
+
+  return null
+}
+
+/**
  * Detects the likely language of an email
  */
 export function detectEmailLanguage(text: string): 'no' | 'en' | 'sv' | 'da' | 'other' {
