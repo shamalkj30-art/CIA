@@ -3,8 +3,6 @@
  * Extracts text from PDF invoices to improve AI extraction accuracy
  */
 
-import pdfParse from 'pdf-parse'
-
 export interface PdfExtractionResult {
   text: string
   numPages: number
@@ -17,6 +15,9 @@ export interface PdfExtractionResult {
  */
 export async function extractPdfText(buffer: Buffer): Promise<PdfExtractionResult> {
   try {
+    // Dynamic import for CommonJS compatibility
+    const pdfParse = (await import('pdf-parse')).default
+
     const data = await pdfParse(buffer, {
       // Preserve layout to keep table structure
       max: 0 // No page limit
