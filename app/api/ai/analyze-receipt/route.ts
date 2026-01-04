@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
         // Analyze extracted text with Claude (text-only)
         completion = await anthropic.messages.create({
-          model: 'claude-3-5-sonnet-20240620',
+          model: 'claude-sonnet-4-5-20250929',
           max_tokens: 1024,
           messages: [
             {
@@ -162,7 +162,7 @@ Return ONLY the JSON object, no other text.`
       // (Claude supports jpeg, png, gif, webp)
 
       completion = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 1024,
         messages: [
           {
