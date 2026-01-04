@@ -240,11 +240,12 @@ ${pdfText ? '=== PDF INVOICE ===\n' + pdfText + '\n=== END PDF ===\n\n' : ''}${e
       if (attachmentData) {
         const fileBuffer = Buffer.from(attachmentData, 'base64')
         fileType = receiptAttachment.content_type || receiptAttachment.contentType || 'application/octet-stream'
-        fileName = receiptAttachment.filename || receiptAttachment.name || `receipt_${Date.now()}`
+        const attachmentFileName = receiptAttachment.filename || receiptAttachment.name || `receipt_${Date.now()}`
+        fileName = attachmentFileName
         fileSize = fileBuffer.length
 
         const timestamp = Date.now()
-        const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const sanitizedName = attachmentFileName.replace(/[^a-zA-Z0-9.-]/g, '_')
         storagePath = `${userId}/${timestamp}_${sanitizedName}`
 
         const { error: uploadError } = await supabase.storage
