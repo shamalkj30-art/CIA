@@ -70,47 +70,59 @@ export const OrderExtractionSchema = z.object({
 
   // Merchant info
   merchant_name: z.string().min(1),
-  merchant_category: MerchantCategorySchema.nullable(),
+  merchant_category: MerchantCategorySchema.nullish(),
   merchant_website: z.preprocess(
     (val) => (!val || val === '' ? null : val),
-    z.string().url().nullable().optional()
+    z.string().url().nullish()
   ),
 
   // Order details
-  order_number: z.string().nullable(),
-  purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), // YYYY-MM-DD
+  order_number: z.string().nullish(),
+  purchase_date: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    z.null(),
+    z.undefined()
+  ]).nullish(), // YYYY-MM-DD
 
   // Financial
-  total_amount: z.number().positive().nullable(),
-  currency: z.string().length(3).nullable(), // ISO 4217
-  subtotal: z.number().positive().nullable().optional(),
-  tax: z.number().nullable().optional(),
-  shipping: z.number().nullable().optional(),
-  discount: z.number().nullable().optional(),
+  total_amount: z.number().positive().nullish(),
+  currency: z.union([
+    z.string().length(3),
+    z.null(),
+    z.undefined()
+  ]).nullish(), // ISO 4217
+  subtotal: z.number().positive().nullish(),
+  tax: z.number().nullish(),
+  shipping: z.number().nullish(),
+  discount: z.number().nullish(),
 
   // Items
-  item_name: z.string().nullable(), // Single item or summary like "Multiple items from Zara"
-  items_list: z.array(z.string()).nullable().optional(),
-  items_count: z.number().int().positive().nullable().optional(),
+  item_name: z.string().nullish(), // Single item or summary like "Multiple items from Zara"
+  items_list: z.array(z.string()).nullish(),
+  items_count: z.number().int().positive().nullish(),
 
   // Return/warranty info
-  return_deadline_days: z.number().int().nonnegative().nullable(),
-  warranty_months: z.number().int().nonnegative().nullable(),
+  return_deadline_days: z.number().int().nonnegative().nullish(),
+  warranty_months: z.number().int().nonnegative().nullish(),
 
   // Delivery info
-  estimated_delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  tracking_number: z.string().nullable().optional(),
+  estimated_delivery_date: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    z.null(),
+    z.undefined()
+  ]).nullish(),
+  tracking_number: z.string().nullish(),
 
   // Invoice attachment
   has_invoice_attachment: z.boolean(),
 
   // Confidence and notes
   confidence: ConfidenceScoresSchema,
-  extraction_notes: z.string().nullable().optional(), // AI's reasoning
+  extraction_notes: z.string().nullish(), // AI's reasoning
   needs_review: z.boolean(), // Flag for manual review
 
   // Raw data for debugging
-  raw_merchant_text: z.string().nullable().optional() // What AI saw as merchant
+  raw_merchant_text: z.string().nullish() // What AI saw as merchant
 })
 
 export type OrderExtraction = z.infer<typeof OrderExtractionSchema>
