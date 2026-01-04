@@ -22,51 +22,66 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 // AI prompt for extracting purchase info from order confirmation emails
-const ORDER_EXTRACTION_PROMPT = `You are a precise data extraction system. Extract ONLY information that is EXPLICITLY stated in the email. DO NOT guess, estimate, or hallucinate.
+const ORDER_EXTRACTION_PROMPT = `You are an intelligent email reader that can understand order confirmation emails in ANY language and format.
 
-CRITICAL RULES:
-1. Extract ONLY what you can see clearly in the email text
-2. If a field is not found, use null (not a guess)
-3. For dates, use the email's received date if no purchase date is stated
-4. For prices, extract the EXACT number shown (convert comma decimals: 1,217,00 → 1217.00)
+YOUR TASK:
+Read the ENTIRE email content carefully. Analyze it to determine if it's an order confirmation/purchase receipt, then extract all available purchase information.
 
-EXTRACTION INSTRUCTIONS:
+HOW TO IDENTIFY ORDER CONFIRMATIONS:
+- Contains purchase/order confirmation language (any language)
+- Shows items/products purchased
+- Displays prices, totals, or payment information
+- Contains order numbers, reference codes, or tracking information
+- Mentions delivery, shipping, or receipt information
+- Can be in ANY language (Norwegian, English, etc.)
+- Can be forwarded emails (look for the ORIGINAL email content inside)
 
-1. MERCHANT: Look for store/brand name in:
-   - Email sender domain (news@email.mango → "Mango")
-   - Email subject
-   - Email body headers/logos
-   - Example: "MANGO" logo or "news@email.mango" → merchant: "Mango"
+EXTRACTION RULES:
+1. Read the ENTIRE email - scroll through all content, don't stop at the first paragraph
+2. Extract ONLY what is explicitly stated - be precise
+3. If information is missing, use null (don't guess)
+4. For prices: convert comma decimals (1,217,00 → 1217.00, 86,98 → 86.98)
+5. For dates: use YYYY-MM-DD format, use email received date if purchase date not found
+6. For multiple items: use "Multiple items from [Merchant]" and list all in items_list
 
-2. ORDER NUMBER: Look for:
-   - "Bestillingsnr." / "Bestillingsnummer" / "Order number" / "Order #"
-   - Barcode numbers (like "EX38T7" or "EX387700")
-   - Reference codes
-   - Example: "Bestillingsnr. EX38T7" → order_number: "EX38T7"
+WHAT TO EXTRACT:
 
-3. TOTAL AMOUNT: Look for:
-   - "Totalt" / "Total" / "TIL SAMMEN" / "Sum"
-   - Usually at bottom of item list
-   - Extract the number, convert comma to decimal
-   - Example: "kr 1 217,00" → total_amount: 1217.00, currency: "NOK"
-   - Example: "$86,98" → total_amount: 86.98, currency: "USD"
+MERCHANT: Store/brand name from:
+- Email sender domain (extract brand from domain)
+- Email body (logos, headers, store names)
+- Any recognizable retailer name
 
-4. ITEMS: Count items listed:
-   - If 1 item: use item name
-   - If 2+ items: use "Multiple items from [Merchant]"
-   - List all items in items_list array
+ORDER NUMBER: Any of:
+- Order numbers, confirmation numbers
+- Reference codes, order IDs
+- Barcode numbers
+- Transaction IDs
 
-5. PURCHASE DATE:
-   - Look for: "Dato" / "Date" / "Kjøpt" / "Purchased"
-   - If not found, use email received date (provided separately)
-   - Format: YYYY-MM-DD
+TOTAL AMOUNT: Look for:
+- Total, Totalt, TIL SAMMEN, Sum, Total amount
+- Final price after all items
+- Convert to number (handle comma decimals)
 
-6. RETURN DEADLINE:
-   - Look for: "14 dager" / "30 dager" / "angrerett" / "return policy"
-   - Norwegian default: 14 days if not specified
-   - Format as number of days
+CURRENCY: Extract from:
+- Price symbols (kr, NOK, $, USD, €, EUR, etc.)
+- Currency codes in the email
 
-Return this EXACT JSON structure:
+ITEMS: 
+- Count all items/products listed
+- If 1 item: use its name
+- If 2+ items: use "Multiple items from [Merchant]"
+- List all items in items_list array
+
+PURCHASE DATE:
+- Look for date of purchase, order date
+- If not found, use email received date (provided separately)
+
+RETURN DEADLINE:
+- Look for return policy, exchange policy
+- Common: 14 days, 30 days, 60 days
+- Extract number of days
+
+Return this JSON structure:
 {
   "is_order_confirmation": true/false,
   "item_name": "string or null",
@@ -82,36 +97,14 @@ Return this EXACT JSON structure:
   "notes": "string or null"
 }
 
-EXAMPLES:
+IMPORTANT:
+- Read the FULL email content, not just the beginning
+- Understand context - forwarded emails contain the original email inside
+- Work with ANY language - Norwegian, English, etc.
+- Be thorough - scroll through all sections of the email
+- Set is_order_confirmation: true if it's clearly a purchase confirmation
 
-Norwegian Mango email:
-- Subject: "Takk for ditt kjøp hos Mango"
-- Body: "Bestillingsnr. EX38T7" + "Totalt: kr 1 217,00" + 3 items listed
-→ {
-  "is_order_confirmation": true,
-  "item_name": "Multiple items from Mango",
-  "merchant": "Mango",
-  "order_number": "EX38T7",
-  "total_amount": 1217.00,
-  "currency": "NOK",
-  "items_list": ["Leopardmønstret kjole", "Prikkete bluse", "Langt skjørt"],
-  "confidence": "high"
-}
-
-Norwegian Zara email:
-- Subject: "Takk for kjøpet"
-- Body: "BESTILLING NR. 54539983872" + "TIL SAMMEN 1 435,00 NOK" + 4 items
-→ {
-  "is_order_confirmation": true,
-  "item_name": "Multiple items from Zara",
-  "merchant": "Zara",
-  "order_number": "54539983872",
-  "total_amount": 1435.00,
-  "currency": "NOK",
-  "confidence": "high"
-}
-
-Return ONLY the JSON object, no other text.`
+Return ONLY valid JSON, no explanation.`
 
 // This endpoint receives emails via webhook from Resend
 // POST /api/email/receive
@@ -274,11 +267,11 @@ export async function POST(request: NextRequest) {
 Email From: ${from}
 Email Received Date: ${emailReceivedDate}
 
-EMAIL CONTENT:
+FULL EMAIL CONTENT (read everything, scroll through all sections):
 ${emailContentForAI}`
     
-    // Take up to 15000 chars (increased for full email content)
-    const emailContent = fullContent.slice(0, 15000)
+    // Send up to 50000 chars to ensure AI gets the FULL email (including long HTML emails)
+    const emailContent = fullContent.slice(0, 50000)
     
     console.log('Email content length:', emailContent.length)
     console.log('Email content preview (first 1500 chars):', emailContent.slice(0, 1500))
@@ -296,7 +289,7 @@ ${emailContentForAI}`
           { role: 'system', content: ORDER_EXTRACTION_PROMPT },
           { role: 'user', content: emailContent }
         ],
-        max_tokens: 1500,
+        max_tokens: 2000, // Increased for longer analysis
         temperature: 0, // Use 0 for deterministic extraction
         response_format: { type: 'json_object' } // Force JSON output
       })
@@ -357,89 +350,21 @@ ${emailContentForAI}`
     console.log('AI analysis result:', analysis)
 
     // Check if this is an order confirmation
-    // Fallback: Check subject/from for order confirmation keywords if AI says no
-    const orderKeywords = [
-      'takk for kjøpet', 'takk for kjøp', 'takk for ditt kjøp', 'thanks for purchase', 
-      'order confirmation', 'orderbekreftelse', 'bestilling', 'ordre', 
-      'purchase confirmation', 'bekreftelse', 'kjøp', 'purchase'
-    ]
-    const subjectLower = subject.toLowerCase()
-    const hasOrderKeywords = orderKeywords.some(keyword => subjectLower.includes(keyword))
-    const fromLower = from.toLowerCase()
-    const emailContentLower = emailContent.toLowerCase()
-    const isFromKnownStore = fromLower.includes('zara') || fromLower.includes('mango') ||
-                            fromLower.includes('h&m') || fromLower.includes('hm.com') || 
-                            fromLower.includes('nike') || fromLower.includes('adidas') || 
-                            fromLower.includes('amazon') || emailContentLower.includes('mango') ||
-                            emailContentLower.includes('zara')
-
-    // Check if we should process based on keywords/store detection
-    const shouldProcess = hasOrderKeywords || isFromKnownStore
-    
     console.log('Order confirmation check:')
-    console.log('- AI says:', analysis?.is_order_confirmation)
-    console.log('- Subject keywords:', hasOrderKeywords, '(subject:', subject, ')')
-    console.log('- Known store:', isFromKnownStore, '(from:', from, ')')
-    console.log('- Should process:', shouldProcess)
+    console.log('- AI analysis result:', analysis?.is_order_confirmation)
+    console.log('- Confidence:', analysis?.confidence)
+    console.log('- Merchant:', analysis?.merchant)
+    console.log('- Order number:', analysis?.order_number)
 
-    // If AI says no AND no keywords/store detected, reject
-    if (!analysis || (analysis.is_order_confirmation === false && !shouldProcess)) {
-      console.log('Rejecting: Not an order confirmation email')
+    // Trust the AI's decision - if it says it's not an order confirmation, reject
+    if (!analysis || analysis.is_order_confirmation === false) {
+      console.log('AI determined this is not an order confirmation')
       await supabase.from('processed_emails').insert({
         user_id: userId,
         email_id: messageId,
         result: 'not_order'
       })
       return NextResponse.json({ message: 'Email does not appear to be an order confirmation' }, { status: 200 })
-    }
-
-    // If AI said no but we have keywords/store, create a basic analysis and re-run AI with better context
-    if (!analysis || (analysis.is_order_confirmation === false && shouldProcess)) {
-      console.log('AI said no, but keywords/store detected - forcing processing and re-analyzing with better prompt')
-      
-      // Try AI again with more explicit instruction
-      try {
-        const retryCompletion = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            { 
-              role: 'system', 
-              content: `This email subject contains "${subject}" which indicates it's an order confirmation. Extract purchase information from the email content. Return JSON with: is_order_confirmation: true, merchant, order_number, total_amount, currency, item_name, items_list, purchase_date, return_deadline_days.` 
-            },
-            { role: 'user', content: emailContent }
-          ],
-          max_tokens: 1500,
-          temperature: 0,
-          response_format: { type: 'json_object' }
-        })
-        
-        const retryContent = retryCompletion.choices[0]?.message?.content || '{}'
-        const retryAnalysis = JSON.parse(retryContent)
-        
-        if (retryAnalysis.is_order_confirmation === true) {
-          console.log('Retry AI succeeded:', retryAnalysis)
-          analysis = retryAnalysis
-        } else {
-          throw new Error('Retry also failed')
-        }
-      } catch (retryError) {
-        console.log('Retry failed, using fallback analysis')
-        // Fallback: create basic analysis from keywords
-        analysis = {
-          is_order_confirmation: true,
-          item_name: subject.replace(/^(Fwd:|Re:|FW:)\s*/i, '').trim() || 'Order from Email',
-          merchant: from.includes('@') ? from.split('@')[1].split('.')[0] : from,
-          order_number: null,
-          purchase_date: emailReceivedDate,
-          total_amount: null,
-          currency: 'NOK',
-          return_deadline_days: 14, // Default for Norwegian stores
-          warranty_months: 0,
-          items_list: [],
-          confidence: 'low',
-          notes: 'Auto-detected from subject/from keywords - AI extraction failed'
-        }
-      }
     }
 
     // Store the email HTML as a receipt document
