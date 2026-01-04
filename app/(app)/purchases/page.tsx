@@ -6,6 +6,7 @@ import type { PurchaseWithDocuments } from '@/lib/types'
 
 type SortOption = 'newest' | 'oldest' | 'name' | 'expiring'
 type FilterOption = 'all' | 'active' | 'expiring' | 'expired'
+type ViewMode = 'list' | 'grid'
 
 export default function PurchasesPage() {
   const [purchases, setPurchases] = useState<PurchaseWithDocuments[]>([])
@@ -16,6 +17,7 @@ export default function PurchasesPage() {
   const [filterBy, setFilterBy] = useState<FilterOption>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -246,6 +248,36 @@ export default function PurchasesPage() {
         {/* Spacer */}
         <div className="flex-1" />
 
+        {/* View Toggle */}
+        <div className="flex bg-[var(--card)] rounded-xl p-1 border border-[var(--border)]">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-2 rounded-lg transition-all ${
+              viewMode === 'list'
+                ? 'bg-[var(--primary)] text-white shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
+            }`}
+            title="List view"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-2 rounded-lg transition-all ${
+              viewMode === 'grid'
+                ? 'bg-[var(--primary)] text-white shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
+            }`}
+            title="Grid view"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+        </div>
+
         {/* Sort Dropdown */}
         <div id="sort-dropdown-container" className="relative">
           <button
@@ -372,8 +404,8 @@ export default function PurchasesPage() {
             </Link>
           )}
         </div>
-      ) : (
-        /* Purchases List */
+      ) : viewMode === 'list' ? (
+        /* Purchases List View */
         <div className="space-y-3">
           {/* Select All Header */}
           <div className="flex items-center gap-3 px-2">
@@ -399,7 +431,7 @@ export default function PurchasesPage() {
           {filteredPurchases.map((purchase) => {
             const warrantyStatus = getWarrantyStatus(purchase.warranty_expires_at)
             const isSelected = selectedIds.has(purchase.id)
-            
+
             return (
               <div
                 key={purchase.id}
@@ -492,6 +524,74 @@ export default function PurchasesPage() {
               </div>
             )
           })}
+        </div>
+      ) : (
+        /* Purchases Grid View */
+        <div>
+          {/* Results count */}
+          <div className="flex items-center gap-3 px-2 mb-4">
+            <span className="text-sm text-[var(--text-muted)]">
+              {filteredPurchases.length} {filteredPurchases.length === 1 ? 'result' : 'results'}
+            </span>
+          </div>
+
+          {/* Grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredPurchases.map((purchase) => {
+              const warrantyStatus = getWarrantyStatus(purchase.warranty_expires_at)
+
+              return (
+                <Link
+                  key={purchase.id}
+                  href={`/purchases/${purchase.id}`}
+                  className="card p-4 transition-all hover:shadow-lg hover:border-[var(--primary)] group"
+                >
+                  {/* Placeholder Image */}
+                  <div className="aspect-[4/3] bg-[var(--surface-subtle)] rounded-xl mb-4 flex items-center justify-center">
+                    <svg className="w-12 h-12 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--primary)] transition-colors">
+                        {purchase.item_name}
+                      </h3>
+                      <p className="text-sm text-[var(--text-muted)] truncate">
+                        {purchase.merchant || 'Unknown merchant'}
+                      </p>
+                    </div>
+                    {warrantyStatus && (
+                      <span className={`badge flex-shrink-0 ${
+                        warrantyStatus.status === 'expired'
+                          ? 'badge-error'
+                          : warrantyStatus.status === 'warning'
+                          ? 'badge-warning'
+                          : 'badge-success'
+                      }`}>
+                        {warrantyStatus.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Meta */}
+                  <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
+                    {purchase.price && (
+                      <>
+                        <span className="font-medium text-[var(--text-primary)]">
+                          ${purchase.price.toFixed(2)}
+                        </span>
+                        <span>•</span>
+                      </>
+                    )}
+                    <span>{formatDate(purchase.purchase_date)}</span>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
