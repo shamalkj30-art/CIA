@@ -71,7 +71,10 @@ export const OrderExtractionSchema = z.object({
   // Merchant info
   merchant_name: z.string().min(1),
   merchant_category: MerchantCategorySchema.nullable(),
-  merchant_website: z.string().url().nullable().optional(),
+  merchant_website: z.preprocess(
+    (val) => (!val || val === '' ? null : val),
+    z.string().url().nullable().optional()
+  ),
 
   // Order details
   order_number: z.string().nullable(),
