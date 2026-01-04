@@ -110,17 +110,27 @@ export async function POST(request: NextRequest) {
     const userId = user.id
     console.log('✅ Found user:', user.email)
 
-    // Check for duplicate processing
+    // Check for duplicate processing (only skip if successfully processed)
     const { data: existingEmail } = await supabase
       .from('processed_emails')
-      .select('id')
+      .select('id, result')
       .eq('user_id', userId)
       .eq('email_id', messageId)
       .single()
 
     if (existingEmail) {
-      console.log('⚠️ Email already processed:', messageId)
-      return NextResponse.json({ message: 'Email already processed' }, { status: 200 })
+      // Only skip if it was successfully processed, allow retry for failures
+      if (existingEmail.result === 'created_purchase' || existingEmail.result === 'not_purchase') {
+        console.log('⚠️ Email already processed:', messageId, 'result:', existingEmail.result)
+        return NextResponse.json({ message: 'Email already processed' }, { status: 200 })
+      } else {
+        // Failed previously, delete old record and retry
+        console.log('🔄 Retrying previously failed email:', messageId)
+        await supabase
+          .from('processed_emails')
+          .delete()
+          .eq('id', existingEmail.id)
+      }
     }
 
     // === IMPROVED EMAIL PARSING ===
@@ -176,17 +186,18 @@ ${pdfText ? '=== PDF INVOICE ===\n' + pdfText + '\n=== END PDF ===\n\n' : ''}${e
 
     if (!extractionResult.success || !extractionResult.data) {
       console.error('❌ AI extraction failed:', extractionResult.error)
+      console.error('📧 Email details:', { subject, fromLength: from.length, textLength: textBody.length, htmlLength: htmlBody.length })
 
-      // Record failure
+      // Record failure with detailed error
       await supabase.from('processed_emails').insert({
         user_id: userId,
         email_id: messageId,
         result: 'failed',
-        error_message: extractionResult.error || 'AI extraction failed'
+        error_message: `AI extraction failed: ${extractionResult.error || 'Unknown error'}. Retries: ${extractionResult.retries}`
       })
 
       return NextResponse.json(
-        { error: 'Failed to analyze email', details: extractionResult.error },
+        { error: 'Failed to analyze email', details: extractionResult.error, retries: extractionResult.retries },
         { status: 500 }
       )
     }
