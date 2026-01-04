@@ -728,9 +728,9 @@ export default function UploadPage() {
               <label htmlFor="price" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Price
               </label>
-              <div className="relative flex">
-                <div className="flex items-center justify-center w-12 bg-[var(--surface-subtle)] border border-r-0 border-[var(--border)] rounded-l-[10px] text-[var(--text-muted)] font-medium">
-                  $
+              <div className="relative">
+                <div className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center bg-[var(--surface-subtle)] border-r border-[var(--border)] rounded-l-[10px]">
+                  <span className="text-[var(--text-muted)] font-medium">$</span>
                 </div>
                 <input
                   id="price"
@@ -740,7 +740,7 @@ export default function UploadPage() {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="0.00"
-                  className="input flex-1 rounded-l-none pl-3"
+                  className="input pl-14"
                 />
               </div>
             </div>

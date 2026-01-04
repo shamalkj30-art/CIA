@@ -1,13 +1,18 @@
+/**
+ * Manual Receipt Upload Analysis
+ * Uses Anthropic Claude for consistent, high-quality extraction
+ */
+
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 
-function getOpenAIClient() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY not configured')
+function getAnthropicClient() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY not configured. Please add it to your environment variables.')
   }
-  return new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
   })
 }
 
@@ -27,7 +32,7 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
-  
+
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -43,9 +48,9 @@ export async function POST(request: NextRequest) {
 
     // Validate file type - accept common receipt formats
     const allowedTypes = [
-      'image/jpeg', 
-      'image/png', 
-      'image/webp', 
+      'image/jpeg',
+      'image/png',
+      'image/webp',
       'image/gif',
       'image/heic',
       'image/heif',
@@ -53,13 +58,13 @@ export async function POST(request: NextRequest) {
       'image/tiff',
       'image/bmp'
     ]
-    
+
     // Also check by extension for better compatibility
     const fileName = file.name.toLowerCase()
     const hasValidExtension = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.heic', '.tiff', '.bmp'].some(
       ext => fileName.endsWith(ext)
     )
-    
+
     if (!allowedTypes.includes(file.type) && !hasValidExtension) {
       return NextResponse.json(
         { error: 'Invalid file type. Allowed: JPG, PNG, WebP, GIF, PDF, HEIC, TIFF, BMP' },
@@ -68,22 +73,22 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer()
-    const openai = getOpenAIClient()
+    const anthropic = getAnthropicClient()
     let completion
 
-    // Handle PDF - extract text and analyze with GPT
+    // Handle PDF - extract text and analyze with Claude
     const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf')
-    
+
     if (isPdf) {
       try {
         const { extractTextFromPdf } = await import('@/lib/pdf-to-image')
         const pdfText = await extractTextFromPdf(arrayBuffer)
-        
+
         console.log('Extracted PDF text length:', pdfText.length)
-        
+
         if (!pdfText || pdfText.trim().length < 10) {
           return NextResponse.json(
-            { 
+            {
               error: 'Could not extract readable text from this PDF. It appears to be a scanned or image-based PDF. Please take a screenshot of the PDF and upload that instead.',
               suggestion: 'Try: Open the PDF → Take a screenshot → Upload the screenshot'
             },
@@ -91,37 +96,48 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // Analyze extracted text with GPT
-        completion = await openai.chat.completions.create({
-          model: 'gpt-4o',
+        // Analyze extracted text with Claude (text-only)
+        completion = await anthropic.messages.create({
+          model: 'claude-3-7-sonnet-20250219',
+          max_tokens: 1024,
           messages: [
             {
-              role: 'system',
-              content: `You are an expert at extracting purchase information from receipt text. Analyze the receipt text and extract the following information if available:
-- item_name: The main product or item purchased (be specific, combine multiple items if needed)
-- merchant: The store or business name
-- purchase_date: The purchase date in YYYY-MM-DD format
-- warranty_months: Warranty period in months (if mentioned, otherwise null)
-- total_amount: The total amount paid (number only, no currency symbol)
-- currency: The currency code (USD, EUR, NOK, GBP, etc.)
-
-Return a JSON object with these fields. If a field cannot be determined from the receipt, omit it or set to null.
-Include a "confidence" field with value "high", "medium", or "low" based on how clearly the information is visible.
-Include a "missing_fields" array listing fields that could not be extracted.
-
-Only return valid JSON, no other text.`,
-            },
-            {
               role: 'user',
-              content: `Extract purchase information from this receipt text:\n\n${pdfText}\n\nReturn only valid JSON.`,
-            },
-          ],
-          max_tokens: 500,
+              content: `Extract purchase information from this receipt text and return ONLY valid JSON.
+
+Receipt text:
+${pdfText}
+
+Return a JSON object with these fields:
+- item_name: Main product/item purchased (combine multiple if needed)
+- merchant: Store/business name
+- purchase_date: Date in YYYY-MM-DD format
+- warranty_months: Warranty period in months (if mentioned, otherwise null)
+- total_amount: Total amount paid (number only, no currency symbol)
+- currency: Currency code (USD, EUR, NOK, GBP, etc.)
+- confidence: "high", "medium", or "low"
+- missing_fields: Array of fields that couldn't be extracted
+
+Example:
+{
+  "item_name": "MacBook Pro 14-inch",
+  "merchant": "Apple Store",
+  "purchase_date": "2024-01-15",
+  "warranty_months": 12,
+  "total_amount": 1999.00,
+  "currency": "USD",
+  "confidence": "high",
+  "missing_fields": []
+}
+
+Return ONLY the JSON object, no other text.`
+            }
+          ]
         })
       } catch (pdfError: any) {
         console.error('PDF processing error:', pdfError)
         return NextResponse.json(
-          { 
+          {
             error: pdfError.message || 'Failed to process PDF. Please take a screenshot and upload the image instead.',
             suggestion: 'This PDF might be image-based. Try taking a screenshot and uploading that.'
           },
@@ -129,63 +145,82 @@ Only return valid JSON, no other text.`,
         )
       }
     } else {
-      // Handle images - use Vision API
+      // Handle images - use Claude's Vision API
       const base64 = Buffer.from(arrayBuffer).toString('base64')
-      
-      // Determine correct MIME type
-      let mimeType = file.type
-      if (!mimeType || mimeType === 'application/octet-stream') {
-        // Guess from extension
-        if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) mimeType = 'image/jpeg'
-        else if (fileName.endsWith('.png')) mimeType = 'image/png'
-        else if (fileName.endsWith('.gif')) mimeType = 'image/gif'
-        else if (fileName.endsWith('.webp')) mimeType = 'image/webp'
-        else if (fileName.endsWith('.heic')) mimeType = 'image/heic'
-        else mimeType = 'image/jpeg' // Default
+
+      // Determine correct MIME type for Claude
+      let mimeType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg'
+
+      if (file.type === 'image/png' || fileName.endsWith('.png')) {
+        mimeType = 'image/png'
+      } else if (file.type === 'image/gif' || fileName.endsWith('.gif')) {
+        mimeType = 'image/gif'
+      } else if (file.type === 'image/webp' || fileName.endsWith('.webp')) {
+        mimeType = 'image/webp'
       }
-      
-      const dataUrl = `data:${mimeType};base64,${base64}`
+      // HEIC, TIFF, BMP need conversion - for now treat as JPEG
+      // (Claude supports jpeg, png, gif, webp)
 
-      completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+      completion = await anthropic.messages.create({
+        model: 'claude-3-7-sonnet-20250219',
+        max_tokens: 1024,
         messages: [
-          {
-            role: 'system',
-            content: `You are an expert at extracting purchase information from receipts. Analyze the receipt image and extract the following information if available:
-- item_name: The main product or item purchased (be specific, combine multiple items if needed)
-- merchant: The store or business name
-- purchase_date: The purchase date in YYYY-MM-DD format
-- warranty_months: Warranty period in months (if mentioned, otherwise null)
-- total_amount: The total amount paid (number only, no currency symbol)
-- currency: The currency code (USD, EUR, NOK, GBP, etc.)
-
-Return a JSON object with these fields. If a field cannot be determined from the receipt, omit it or set to null.
-Include a "confidence" field with value "high", "medium", or "low" based on how clearly the information is visible.
-Include a "missing_fields" array listing fields that could not be extracted.
-
-Only return valid JSON, no other text.`,
-          },
           {
             role: 'user',
             content: [
               {
-                type: 'text',
-                text: 'Extract purchase information from this receipt. Return only valid JSON.',
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: dataUrl,
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: mimeType,
+                  data: base64,
                 },
               },
-            ],
-          },
-        ],
-        max_tokens: 500,
+              {
+                type: 'text',
+                text: `Analyze this receipt image and extract purchase information. Return ONLY valid JSON.
+
+Return a JSON object with these fields:
+- item_name: Main product/item purchased (be specific, combine multiple items if needed)
+- merchant: Store/business name (NOT the email domain)
+- purchase_date: Purchase date in YYYY-MM-DD format
+- warranty_months: Warranty period in months (if mentioned, otherwise null)
+- total_amount: Total amount paid (number only, no currency symbol)
+- currency: Currency code (USD, EUR, NOK, GBP, etc.)
+- confidence: "high", "medium", or "low" based on how clear the receipt is
+- missing_fields: Array of field names that couldn't be extracted
+
+Example:
+{
+  "item_name": "MacBook Pro 14-inch",
+  "merchant": "Apple Store",
+  "purchase_date": "2024-01-15",
+  "warranty_months": 12,
+  "total_amount": 1999.00,
+  "currency": "USD",
+  "confidence": "high",
+  "missing_fields": []
+}
+
+IMPORTANT:
+- For Norwegian receipts: "kr" or "NOK" = Norwegian Kroner
+- Extract the TOTAL amount, not individual items
+- If multiple items, list the main one or say "Multiple items from [Store]"
+
+Return ONLY the JSON object, no other text.`
+              }
+            ]
+          }
+        ]
       })
     }
 
-    const content = completion.choices[0]?.message?.content
+    // Extract text from Claude's response
+    const textBlock = completion.content.find(
+      (block): block is Anthropic.TextBlock => block.type === 'text'
+    )
+
+    const content = textBlock?.text
     if (!content) {
       return NextResponse.json({ error: 'Failed to analyze receipt' }, { status: 500 })
     }
@@ -216,13 +251,15 @@ Only return valid JSON, no other text.`,
       )
     }
 
+    console.log('Receipt analysis complete:', analysis)
+
     return NextResponse.json(analysis)
   } catch (error: any) {
     console.error('Error analyzing receipt:', error)
-    
-    if (error.message?.includes('API key')) {
+
+    if (error.message?.includes('API key') || error.message?.includes('ANTHROPIC')) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your environment variables.' },
+        { error: 'Anthropic API key not configured. Please add ANTHROPIC_API_KEY to your environment variables.' },
         { status: 500 }
       )
     }
