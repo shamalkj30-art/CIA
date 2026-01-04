@@ -250,7 +250,7 @@ ${pdfText ? '=== PDF INVOICE ===\n' + pdfText + '\n=== END PDF ===\n\n' : ''}${e
 
         const { error: uploadError } = await supabase.storage
           .from('receipts')
-          .upload(storagePath, fileBuffer, { contentType: fileType })
+          .upload(storagePath, fileBuffer, { contentType: fileType || undefined })
 
         if (uploadError) {
           console.error('❌ Attachment upload error:', uploadError)

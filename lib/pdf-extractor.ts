@@ -15,8 +15,9 @@ export interface PdfExtractionResult {
  */
 export async function extractPdfText(buffer: Buffer): Promise<PdfExtractionResult> {
   try {
-    // Dynamic import for CommonJS compatibility
-    const pdfParse = (await import('pdf-parse')).default
+    // Use require for CommonJS module
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfParse = require('pdf-parse')
 
     const data = await pdfParse(buffer, {
       // Preserve layout to keep table structure
