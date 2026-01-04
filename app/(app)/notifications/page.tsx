@@ -1,9 +1,124 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Card, Badge } from '@/components/ui'
 import type { Notification, NotificationSettings } from '@/lib/types'
+
+// Custom Dropdown Component
+interface DropdownOption {
+  value: number
+  label: string
+}
+
+interface CustomDropdownProps {
+  value: number
+  options: DropdownOption[]
+  onChange: (value: number) => void
+  disabled?: boolean
+}
+
+function CustomDropdown({ value, options, onChange, disabled }: CustomDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const selectedOption = options.find(o => o.value === value)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`
+          w-full px-3 py-2.5 text-sm text-left
+          bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl
+          text-[var(--text-primary)] font-medium
+          flex items-center justify-between gap-2
+          transition-all duration-200
+          hover:border-[var(--border-hover)] hover:bg-[var(--surface)]
+          focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 focus:ring-offset-[var(--background)]
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${isOpen ? 'ring-2 ring-[var(--primary)] ring-offset-2 ring-offset-[var(--background)]' : ''}
+        `}
+      >
+        <span>{selectedOption?.label || 'Select...'}</span>
+        <svg
+          className={`w-4 h-4 text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-2 py-1.5 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value)
+                setIsOpen(false)
+              }}
+              className={`
+                w-full px-3 py-2.5 text-sm text-left
+                flex items-center justify-between
+                transition-colors duration-100
+                ${option.value === value
+                  ? 'bg-[var(--primary-soft)] text-[var(--primary)] font-medium'
+                  : 'text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
+                }
+              `}
+            >
+              <span>{option.label}</span>
+              {option.value === value && (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Day options for dropdowns
+const warrantyDayOptions: DropdownOption[] = [
+  { value: 7, label: '7 days before' },
+  { value: 14, label: '14 days before' },
+  { value: 30, label: '30 days before' },
+  { value: 60, label: '60 days before' },
+  { value: 90, label: '90 days before' },
+]
+
+const returnDayOptions: DropdownOption[] = [
+  { value: 1, label: '1 day before' },
+  { value: 3, label: '3 days before' },
+  { value: 5, label: '5 days before' },
+  { value: 7, label: '7 days before' },
+  { value: 14, label: '14 days before' },
+]
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -306,18 +421,12 @@ export default function NotificationsPage() {
                       <label className="text-xs text-[var(--text-muted)] mb-1.5 block">
                         Notify me this many days before
                       </label>
-                      <select
+                      <CustomDropdown
                         value={settings.warranty_expiring_days}
-                        onChange={(e) => updateSettings('warranty_expiring_days', parseInt(e.target.value))}
+                        options={warrantyDayOptions}
+                        onChange={(value) => updateSettings('warranty_expiring_days', value)}
                         disabled={savingSettings}
-                        className="w-full px-3 py-2 text-sm bg-[var(--surface-subtle)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                      >
-                        <option value={7}>7 days</option>
-                        <option value={14}>14 days</option>
-                        <option value={30}>30 days</option>
-                        <option value={60}>60 days</option>
-                        <option value={90}>90 days</option>
-                      </select>
+                      />
                     </div>
                   )}
                 </div>
@@ -356,18 +465,12 @@ export default function NotificationsPage() {
                       <label className="text-xs text-[var(--text-muted)] mb-1.5 block">
                         Notify me this many days before
                       </label>
-                      <select
+                      <CustomDropdown
                         value={settings.return_deadline_days}
-                        onChange={(e) => updateSettings('return_deadline_days', parseInt(e.target.value))}
+                        options={returnDayOptions}
+                        onChange={(value) => updateSettings('return_deadline_days', value)}
                         disabled={savingSettings}
-                        className="w-full px-3 py-2 text-sm bg-[var(--surface-subtle)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                      >
-                        <option value={1}>1 day</option>
-                        <option value={3}>3 days</option>
-                        <option value={5}>5 days</option>
-                        <option value={7}>7 days</option>
-                        <option value={14}>14 days</option>
-                      </select>
+                      />
                     </div>
                   )}
                 </div>
