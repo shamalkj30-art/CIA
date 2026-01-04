@@ -218,7 +218,14 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-1">{purchase.item_name}</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{purchase.item_name}</h1>
+            {(purchase as any).auto_detected && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full">
+                Auto-detected
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-[var(--text-muted)]">
             {purchase.merchant && (
               <>
@@ -227,6 +234,12 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
               </>
             )}
             <span>{formatDate(purchase.purchase_date)}</span>
+            {(purchase as any).order_number && (
+              <>
+                <span>•</span>
+                <span className="font-mono text-sm">#{(purchase as any).order_number}</span>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -371,6 +384,25 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               )}
 
+              {/* Return Deadline Alert */}
+              {(purchase as any).return_deadline && new Date((purchase as any).return_deadline) > new Date() && (
+                <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-700 dark:text-amber-400">
+                      Return deadline: {formatDate((purchase as any).return_deadline)}
+                    </p>
+                    <p className="text-sm text-amber-600 dark:text-amber-500">
+                      {Math.ceil((new Date((purchase as any).return_deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left to return
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <dl className="grid sm:grid-cols-2 gap-6">
                 <div>
                   <dt className="text-sm text-[var(--text-muted)] mb-1">Merchant</dt>
@@ -390,6 +422,29 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                   <dt className="text-sm text-[var(--text-muted)] mb-1">Warranty Period</dt>
                   <dd className="font-medium text-[var(--text-primary)]">
                     {purchase.warranty_months > 0 ? `${purchase.warranty_months} months` : 'No warranty'}
+                  </dd>
+                </div>
+                {(purchase as any).order_number && (
+                  <div>
+                    <dt className="text-sm text-[var(--text-muted)] mb-1">Order Number</dt>
+                    <dd className="font-medium font-mono text-[var(--text-primary)]">{(purchase as any).order_number}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-sm text-[var(--text-muted)] mb-1">Source</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">
+                    {(purchase as any).source === 'gmail_auto' ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+                        </svg>
+                        Gmail Auto-Sync
+                      </span>
+                    ) : (purchase as any).source === 'email_forwarded' ? (
+                      'Email Forwarded'
+                    ) : (
+                      'Manual Entry'
+                    )}
                   </dd>
                 </div>
                 <div>

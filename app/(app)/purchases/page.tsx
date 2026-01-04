@@ -357,6 +357,11 @@ export default function PurchasesPage() {
                       <h3 className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--primary)] transition-colors">
                         {purchase.item_name}
                       </h3>
+                      {(purchase as any).auto_detected && (
+                        <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
+                          Auto
+                        </span>
+                      )}
                       {purchase.documents.length > 0 && (
                         <span className="flex-shrink-0 w-5 h-5 rounded bg-[var(--primary-soft)] flex items-center justify-center">
                           <svg className="w-3 h-3 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -373,6 +378,14 @@ export default function PurchasesPage() {
                         </>
                       )}
                       <span>{formatDate(purchase.purchase_date)}</span>
+                      {(purchase as any).return_deadline && new Date((purchase as any).return_deadline) > new Date() && (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-600 dark:text-amber-400">
+                            Return by {formatDate((purchase as any).return_deadline)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </Link>
 

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from './ThemeToggle'
+import NotificationBell from './NotificationBell'
 
 const navItems = [
   { 
@@ -94,6 +95,10 @@ export default function AppNav() {
         {/* Bottom section */}
         <div className="p-4 border-t border-[var(--border)] space-y-3">
           <div className="flex items-center justify-between px-2">
+            <span className="text-xs text-[var(--text-muted)]">Notifications</span>
+            <NotificationBell />
+          </div>
+          <div className="flex items-center justify-between px-2">
             <span className="text-xs text-[var(--text-muted)]">Theme</span>
             <ThemeToggle />
           </div>
@@ -118,7 +123,8 @@ export default function AppNav() {
             </div>
             <span className="text-lg font-bold text-[var(--text-primary)]">Cyncro</span>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <NotificationBell />
             <ThemeToggle />
             <button
               onClick={handleLogout}

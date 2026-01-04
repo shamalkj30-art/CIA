@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import CopyButton from './CopyButton'
+import GmailConnection from './GmailConnection'
 import Link from 'next/link'
 
 export default async function SettingsPage() {
@@ -49,7 +50,10 @@ export default async function SettingsPage() {
           </div>
         </div>
 
-        {/* Email Forwarding */}
+        {/* Gmail Auto-Sync - NEW */}
+        <GmailConnection />
+
+        {/* Email Forwarding (Alternative) */}
         <div className="card">
           <div className="flex items-start gap-4 mb-6">
             <div className="w-12 h-12 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] flex-shrink-0">
@@ -60,7 +64,7 @@ export default async function SettingsPage() {
             <div>
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">Email Forwarding</h2>
               <p className="text-sm text-[var(--text-muted)]">
-                Forward receipt emails to automatically add them to your account.
+                Alternative: Forward receipt emails manually to add them to your account.
               </p>
             </div>
           </div>
