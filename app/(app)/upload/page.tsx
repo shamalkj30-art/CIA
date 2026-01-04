@@ -119,7 +119,7 @@ function DatePicker({
       currentDate.getMonth() === selectedDateObj.getMonth() &&
       currentDate.getFullYear() === selectedDateObj.getFullYear()
     const isToday = currentDate.getTime() === today.getTime()
-    const isDisabled = minDateObj && currentDate < minDateObj
+    const isDisabled = !!(minDateObj && currentDate < minDateObj)
 
     days.push(
       <button
