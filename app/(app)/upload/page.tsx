@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -33,6 +33,282 @@ const CATEGORIES = [
   { value: 'jewelry', label: 'Jewelry & Watches', icon: '⌚' },
   { value: 'other', label: 'Other', icon: '📦' },
 ]
+
+// Custom Date Picker Component
+function DatePicker({ 
+  value, 
+  onChange, 
+  label,
+  required,
+  min 
+}: { 
+  value: string
+  onChange: (value: string) => void
+  label: string
+  required?: boolean
+  min?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [viewDate, setViewDate] = useState(() => {
+    if (value) return new Date(value)
+    return new Date()
+  })
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate()
+  }
+
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month, 1).getDay()
+  }
+
+  const handleDateSelect = (day: number) => {
+    const selectedDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day)
+    const dateStr = selectedDate.toISOString().split('T')[0]
+    
+    if (min && dateStr < min) return
+    
+    onChange(dateStr)
+    setIsOpen(false)
+  }
+
+  const navigateMonth = (direction: number) => {
+    setViewDate(prev => {
+      const newDate = new Date(prev)
+      newDate.setMonth(newDate.getMonth() + direction)
+      return newDate
+    })
+  }
+
+  const year = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+  const daysInMonth = getDaysInMonth(year, month)
+  const firstDay = getFirstDayOfMonth(year, month)
+  const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+  const selectedDateObj = value ? new Date(value) : null
+  const minDateObj = min ? new Date(min) : null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const days = []
+  for (let i = 0; i < firstDay; i++) {
+    days.push(<div key={`empty-${i}`} className="w-9 h-9" />)
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const currentDate = new Date(year, month, day)
+    const isSelected = selectedDateObj && 
+      currentDate.getDate() === selectedDateObj.getDate() &&
+      currentDate.getMonth() === selectedDateObj.getMonth() &&
+      currentDate.getFullYear() === selectedDateObj.getFullYear()
+    const isToday = currentDate.getTime() === today.getTime()
+    const isDisabled = minDateObj && currentDate < minDateObj
+
+    days.push(
+      <button
+        key={day}
+        type="button"
+        onClick={() => !isDisabled && handleDateSelect(day)}
+        disabled={isDisabled}
+        className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
+          isSelected
+            ? 'bg-[var(--primary)] text-white shadow-md'
+            : isToday
+            ? 'bg-[var(--primary-soft)] text-[var(--primary)] font-semibold'
+            : isDisabled
+            ? 'text-[var(--text-muted)] opacity-40 cursor-not-allowed'
+            : 'text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
+        }`}
+      >
+        {day}
+      </button>
+    )
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+        {label} {required && <span className="text-[var(--danger)]">*</span>}
+      </label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="input w-full flex items-center justify-between text-left"
+      >
+        <span className={value ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}>
+          {value ? formatDisplayDate(value) : 'Select date'}
+        </span>
+        <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-2 p-4 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] w-[280px]">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              type="button"
+              onClick={() => navigateMonth(-1)}
+              className="p-1.5 rounded-lg hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <span className="font-semibold text-[var(--text-primary)]">{monthName}</span>
+            <button
+              type="button"
+              onClick={() => navigateMonth(1)}
+              className="p-1.5 rounded-lg hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Weekdays */}
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+              <div key={day} className="w-9 h-8 flex items-center justify-center text-xs font-medium text-[var(--text-muted)]">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Days */}
+          <div className="grid grid-cols-7 gap-1">
+            {days}
+          </div>
+
+          {/* Quick actions */}
+          <div className="mt-3 pt-3 border-t border-[var(--border)] flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(new Date().toISOString().split('T')[0])
+                setIsOpen(false)
+              }}
+              className="flex-1 py-1.5 text-xs font-medium text-[var(--primary)] hover:bg-[var(--primary-soft)] rounded-lg transition-colors"
+            >
+              Today
+            </button>
+            {value && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('')
+                  setIsOpen(false)
+                }}
+                className="flex-1 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--surface-subtle)] rounded-lg transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Custom Category Dropdown Component
+function CategoryDropdown({
+  value,
+  onChange,
+  categories
+}: {
+  value: string
+  onChange: (value: string) => void
+  categories: typeof CATEGORIES
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedCategory = categories.find(c => c.value === value) || categories[0]
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+        Category
+      </label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="input w-full flex items-center justify-between text-left"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-lg">{selectedCategory.icon}</span>
+          <span className="text-[var(--text-primary)]">{selectedCategory.label}</span>
+        </span>
+        <svg 
+          className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-2 w-full bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden max-h-64 overflow-y-auto">
+          {categories.map((cat) => (
+            <button
+              key={cat.value}
+              type="button"
+              onClick={() => {
+                onChange(cat.value)
+                setIsOpen(false)
+              }}
+              className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors ${
+                value === cat.value
+                  ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+                  : 'hover:bg-[var(--surface-subtle)] text-[var(--text-primary)]'
+              }`}
+            >
+              <span className="text-lg">{cat.icon}</span>
+              <span className="font-medium">{cat.label}</span>
+              {value === cat.value && (
+                <svg className="w-5 h-5 ml-auto text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function UploadPage() {
   const router = useRouter()
@@ -439,19 +715,12 @@ export default function UploadPage() {
                 />
               </div>
 
-              <div>
-                <label htmlFor="purchaseDate" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Purchase Date <span className="text-[var(--danger)]">*</span>
-                </label>
-                <input
-                  id="purchaseDate"
-                  type="date"
-                  value={purchaseDate}
-                  onChange={(e) => setPurchaseDate(e.target.value)}
-                  className="input"
-                  required
-                />
-              </div>
+              <DatePicker
+                label="Purchase Date"
+                value={purchaseDate}
+                onChange={setPurchaseDate}
+                required
+              />
             </div>
 
             {/* Price Row */}
@@ -460,7 +729,9 @@ export default function UploadPage() {
                 Price
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                <div className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center bg-[var(--surface-subtle)] border-r border-[var(--border)] rounded-l-[10px]">
+                  <span className="text-[var(--text-muted)] font-medium">$</span>
+                </div>
                 <input
                   id="price"
                   type="number"
@@ -469,44 +740,25 @@ export default function UploadPage() {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="0.00"
-                  className="input pl-8"
+                  className="input pl-14"
                 />
               </div>
             </div>
 
             {/* Warranty & Category Row */}
             <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="warrantyExpiresAt" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Warranty Expires
-                </label>
-                <input
-                  id="warrantyExpiresAt"
-                  type="date"
-                  value={warrantyExpiresAt}
-                  onChange={(e) => setWarrantyExpiresAt(e.target.value)}
-                  className="input"
-                  min={purchaseDate || undefined}
-                />
-              </div>
+              <DatePicker
+                label="Warranty Expires"
+                value={warrantyExpiresAt}
+                onChange={setWarrantyExpiresAt}
+                min={purchaseDate || undefined}
+              />
 
-              <div>
-                <label htmlFor="category" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Category
-                </label>
-                <select
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="input"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.icon} {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CategoryDropdown
+                value={category}
+                onChange={setCategory}
+                categories={CATEGORIES}
+              />
             </div>
 
             {/* Notes */}
