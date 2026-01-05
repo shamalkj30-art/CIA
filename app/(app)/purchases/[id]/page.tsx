@@ -4,6 +4,7 @@ import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { PurchaseWithDocuments } from '@/lib/types'
+import { NeedsReviewBanner, ProofScoreBadge, TrustIndicator } from '@/components/app'
 
 export default function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -32,6 +33,9 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
   const [generatingPacket, setGeneratingPacket] = useState(false)
   const [packetUrl, setPacketUrl] = useState<string | null>(null)
   const [packetError, setPacketError] = useState<string | null>(null)
+
+  // Verify state
+  const [verifying, setVerifying] = useState(false)
 
   useEffect(() => {
     const fetchPurchase = async () => {
@@ -178,11 +182,31 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
     const expires = new Date(expiresAt)
     const now = new Date()
     const daysLeft = Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    
+
     if (daysLeft < 0) {
       return { label: `Expired ${Math.abs(daysLeft)} days ago`, expired: true, daysLeft }
     }
     return { label: `${daysLeft} days remaining`, expired: false, daysLeft }
+  }
+
+  const handleVerify = async () => {
+    setVerifying(true)
+    try {
+      const response = await fetch(`/api/purchases/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ needs_review: false }),
+      })
+
+      if (response.ok) {
+        const updated = await response.json()
+        setPurchase(updated)
+      }
+    } catch (error) {
+      console.error('Failed to verify:', error)
+    } finally {
+      setVerifying(false)
+    }
   }
 
   if (loading) {
@@ -215,12 +239,18 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
         Back to Purchases
       </Link>
 
+      {/* Needs Review Banner */}
+      {purchase.needs_review && (
+        <NeedsReviewBanner onVerify={handleVerify} loading={verifying} />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{purchase.item_name}</h1>
-            {(purchase as any).auto_detected && (
+            <ProofScoreBadge purchase={purchase} size="md" />
+            {purchase.auto_detected && (
               <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full">
                 Auto-detected
               </span>

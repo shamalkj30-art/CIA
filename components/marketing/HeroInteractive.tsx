@@ -34,7 +34,7 @@ export function HeroInteractive() {
   }
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl shadow-[var(--primary)]/10 overflow-hidden hover:shadow-[var(--primary)]/20 transition-shadow duration-500">
       {/* Browser Chrome */}
       <div className="flex items-center gap-2 px-4 py-3 bg-[var(--surface-subtle)] border-b border-[var(--border)]">
         <div className="flex gap-1.5">

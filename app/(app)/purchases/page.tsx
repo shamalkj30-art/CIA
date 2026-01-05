@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { PurchaseWithDocuments } from '@/lib/types'
+import { ProofScoreBadge } from '@/components/app'
+import { calculateProofScore } from '@/lib/proof-score'
 
 type SortOption = 'newest' | 'oldest' | 'name' | 'expiring'
-type FilterOption = 'all' | 'active' | 'expiring' | 'expired'
+type FilterOption = 'all' | 'active' | 'expiring' | 'expired' | 'needs_review'
 type ViewMode = 'list' | 'grid'
 
 export default function PurchasesPage() {
@@ -368,6 +370,7 @@ export default function PurchasesPage() {
   const filteredPurchases = purchases
     .filter(p => {
       if (filterBy === 'all') return true
+      if (filterBy === 'needs_review') return p.needs_review === true
       const status = getWarrantyStatus(p.warranty_expires_at)
       if (filterBy === 'active') return status?.status === 'active'
       if (filterBy === 'expiring') return status?.status === 'warning'
@@ -504,12 +507,13 @@ export default function PurchasesPage() {
       {/* Filters & Sort */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
         {/* Filter Tabs */}
-        <div className="flex gap-1 bg-[var(--card)] rounded-xl p-1 border border-[var(--border)]">
+        <div className="flex gap-1 bg-[var(--card)] rounded-xl p-1 border border-[var(--border)] overflow-x-auto">
           {[
             { value: 'all', label: 'All' },
             { value: 'active', label: 'Active' },
             { value: 'expiring', label: 'Expiring' },
             { value: 'expired', label: 'Expired' },
+            { value: 'needs_review', label: 'Needs Review' },
           ].map((option) => (
             <button
               key={option.value}
@@ -779,18 +783,21 @@ export default function PurchasesPage() {
                     </div>
                   </Link>
 
-                  {/* Status Badge */}
-                  {warrantyStatus && (
-                    <span className={`badge flex-shrink-0 ${
-                      warrantyStatus.status === 'expired'
-                        ? 'badge-error'
-                        : warrantyStatus.status === 'warning'
-                        ? 'badge-warning'
-                        : 'badge-success'
-                    }`}>
-                      {warrantyStatus.label}
-                    </span>
-                  )}
+                  {/* Status Badges */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <ProofScoreBadge purchase={purchase} size="sm" />
+                    {warrantyStatus && (
+                      <span className={`badge ${
+                        warrantyStatus.status === 'expired'
+                          ? 'badge-error'
+                          : warrantyStatus.status === 'warning'
+                          ? 'badge-warning'
+                          : 'badge-success'
+                      }`}>
+                        {warrantyStatus.label}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Arrow */}
                   <Link href={`/purchases/${purchase.id}`} className="p-2 text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
@@ -839,8 +846,13 @@ export default function PurchasesPage() {
                         {purchase.merchant || 'Unknown merchant'}
                       </p>
                     </div>
+                    <ProofScoreBadge purchase={purchase} size="sm" showTooltip={false} />
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex items-center gap-2 mb-2">
                     {warrantyStatus && (
-                      <span className={`badge flex-shrink-0 ${
+                      <span className={`badge ${
                         warrantyStatus.status === 'expired'
                           ? 'badge-error'
                           : warrantyStatus.status === 'warning'

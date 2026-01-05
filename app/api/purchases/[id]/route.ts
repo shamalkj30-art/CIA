@@ -43,7 +43,7 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { item_name, merchant, purchase_date, price, warranty_expires_at, notes, category } = body
+    const { item_name, merchant, purchase_date, price, warranty_expires_at, notes, category, needs_review } = body
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -67,6 +67,7 @@ export async function PATCH(
     }
     if (notes !== undefined) updateData.notes = notes
     if (category !== undefined) updateData.category = category
+    if (needs_review !== undefined) updateData.needs_review = needs_review
 
     const { data, error } = await supabase
       .from('purchases')

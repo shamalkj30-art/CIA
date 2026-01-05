@@ -61,7 +61,7 @@ export function MarketingHeader() {
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-[var(--primary)] flex items-center justify-center shadow-lg shadow-[var(--primary)]/20 group-hover:shadow-[var(--primary)]/30 transition-shadow">
+              <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/30 transition-shadow">
                 <span className="text-white font-bold text-lg lg:text-xl">C</span>
               </div>
               <span className="text-xl lg:text-2xl font-bold text-[var(--text-primary)] tracking-tight">
