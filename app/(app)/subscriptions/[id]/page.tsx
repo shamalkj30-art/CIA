@@ -5,6 +5,25 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { SubscriptionWithAlerts, CancelKit } from '@/lib/types'
 
+// Format relative time for "Last verified" display
+function formatVerifiedTime(verifiedAt: string): string {
+  const verified = new Date(verifiedAt)
+  const now = new Date()
+  const diffMs = now.getTime() - verified.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffHours < 1) {
+    return 'Just now'
+  } else if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  } else if (diffDays < 7) {
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+  } else {
+    return verified.toLocaleDateString()
+  }
+}
+
 const cadenceLabels: Record<string, string> = {
   daily: 'Daily',
   weekly: 'Weekly',
@@ -490,18 +509,57 @@ export default function SubscriptionDetailPage({ params }: { params: Promise<{ i
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCancelKit(false)} />
           <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--card)] rounded-2xl shadow-2xl">
-            <div className="sticky top-0 bg-[var(--card)] px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                Cancel {subscription.merchant}
-              </h2>
-              <button
-                onClick={() => setShowCancelKit(false)}
-                className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] rounded-lg transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            <div className="sticky top-0 bg-[var(--card)] px-6 py-4 border-b border-[var(--border)]">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                  Cancel {subscription.merchant}
+                </h2>
+                <button
+                  onClick={() => setShowCancelKit(false)}
+                  className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {/* Verification Info */}
+              <div className="flex items-center gap-3 mt-2">
+                {cancelKit.confidence && (
+                  <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+                    cancelKit.confidence === 'high'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                      : cancelKit.confidence === 'medium'
+                      ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {cancelKit.confidence === 'high' ? (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : cancelKit.confidence === 'medium' ? (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01" />
+                      </svg>
+                    )}
+                    {cancelKit.confidence === 'high' ? 'Verified' : cancelKit.confidence === 'medium' ? 'AI Generated' : 'Low Confidence'}
+                  </span>
+                )}
+                {cancelKit.source && (
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {cancelKit.source === 'cached' ? 'From cache' : cancelKit.source === 'web_search' ? 'Web search' : 'AI generated'}
+                  </span>
+                )}
+                {cancelKit.verified_at && (
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Last verified: {formatVerifiedTime(cancelKit.verified_at)}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="p-6 space-y-6">

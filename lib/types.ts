@@ -261,6 +261,10 @@ export interface CancelKit {
     phone: string | null
     cancel_url: string | null
   }
+  // Verification metadata (for smart AI)
+  verified_at?: string
+  source?: 'web_search' | 'cached' | 'ai_generated'
+  confidence?: 'high' | 'medium' | 'low'
 }
 
 export interface CancelStep {
@@ -269,6 +273,36 @@ export interface CancelStep {
   description: string
   action_type: 'navigate' | 'click' | 'call' | 'email' | 'wait'
   action_url?: string
+}
+
+// Cached cancel guide from database
+export interface CancelGuide {
+  id: string
+  merchant: string
+  merchant_normalized: string
+  steps: CancelStep[]
+  cancel_url: string | null
+  support_url: string | null
+  support_email: string | null
+  support_phone: string | null
+  special_requirements: string | null
+  source: 'web_search' | 'cached' | 'ai_generated'
+  confidence: 'high' | 'medium' | 'low'
+  verified_at: string
+  expires_at: string
+  created_at: string
+  updated_at: string
+}
+
+// Service lookup result for auto-fill
+export interface ServiceLookupResult {
+  cancel_url: string | null
+  support_url: string | null
+  support_email: string | null
+  support_phone: string | null
+  verified_at: string
+  source: 'web_search' | 'cached'
+  confidence: 'high' | 'medium' | 'low'
 }
 
 // Subscription with computed fields for UI

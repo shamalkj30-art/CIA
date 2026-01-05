@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import type { Subscription, SubscriptionWithAlerts } from '@/lib/types'
+import type { Subscription, SubscriptionWithAlerts, ServiceLookupResult } from '@/lib/types'
 
 type SortOption = 'charge_date' | 'price_high' | 'price_low' | 'name'
 type FilterOption = 'all' | 'active' | 'expiring' | 'cancelled'
@@ -64,6 +64,11 @@ export default function SubscriptionsPage() {
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
+  // AI auto-fill state
+  const [urlLookupLoading, setUrlLookupLoading] = useState(false)
+  const [urlSuggested, setUrlSuggested] = useState(false)
+  const [lookupConfidence, setLookupConfidence] = useState<'high' | 'medium' | 'low' | null>(null)
+
   const modalRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown on outside click
@@ -96,6 +101,40 @@ export default function SubscriptionsPage() {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(timer)
   }, [search])
+
+  // Auto-fill Cancel URL when merchant name changes
+  useEffect(() => {
+    // Only lookup if merchant is at least 3 characters and modal is open
+    if (!showAddModal || formData.merchant.trim().length < 3) {
+      return
+    }
+
+    // Don't lookup if user has manually entered a URL
+    if (formData.cancel_url && !urlSuggested) {
+      return
+    }
+
+    const lookupTimer = setTimeout(async () => {
+      setUrlLookupLoading(true)
+      try {
+        const response = await fetch(`/api/subscriptions/lookup-service?merchant=${encodeURIComponent(formData.merchant)}`)
+        if (response.ok) {
+          const data: ServiceLookupResult = await response.json()
+          if (data.cancel_url) {
+            setFormData(prev => ({ ...prev, cancel_url: data.cancel_url || '' }))
+            setUrlSuggested(true)
+            setLookupConfidence(data.confidence)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to lookup service:', error)
+      } finally {
+        setUrlLookupLoading(false)
+      }
+    }, 800) // Wait 800ms after user stops typing
+
+    return () => clearTimeout(lookupTimer)
+  }, [formData.merchant, showAddModal])
 
   // Fetch subscriptions
   useEffect(() => {
@@ -270,6 +309,9 @@ export default function SubscriptionsPage() {
         category: '',
         notes: '',
       })
+      // Reset AI state
+      setUrlSuggested(false)
+      setLookupConfidence(null)
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Failed to add subscription')
     } finally {
@@ -800,14 +842,43 @@ export default function SubscriptionsPage() {
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                   Cancel URL
+                  {urlLookupLoading && (
+                    <span className="ml-2 inline-flex items-center text-xs text-[var(--text-muted)]">
+                      <div className="w-3 h-3 border-2 border-[var(--border)] border-t-[var(--primary)] rounded-full animate-spin mr-1" />
+                      Looking up...
+                    </span>
+                  )}
+                  {urlSuggested && !urlLookupLoading && (
+                    <span className={`ml-2 inline-flex items-center text-xs px-1.5 py-0.5 rounded ${
+                      lookupConfidence === 'high'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                        : lookupConfidence === 'medium'
+                        ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      AI-suggested
+                    </span>
+                  )}
                 </label>
                 <input
                   type="url"
                   value={formData.cancel_url}
-                  onChange={(e) => setFormData({ ...formData, cancel_url: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, cancel_url: e.target.value })
+                    // If user manually edits, clear the suggested flag
+                    if (urlSuggested && e.target.value !== formData.cancel_url) {
+                      setUrlSuggested(false)
+                      setLookupConfidence(null)
+                    }
+                  }}
                   placeholder="https://..."
-                  className="input"
+                  className={`input ${urlSuggested ? 'border-[var(--primary)]/50' : ''}`}
                 />
+                {urlSuggested && (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Auto-filled by AI. You can edit or replace this URL.
+                  </p>
+                )}
               </div>
 
               <div>

@@ -218,6 +218,17 @@ Required in `.env.local`:
     - Dashboard now fetches both purchases AND subscriptions data in parallel
     - Timeline shows color-coded dots: red (today), warning (3 days), purple (future)
     - Needs Review stat card links directly to inbox for easy access
+16. **Smart AI Cancel Kit** (Jan 5, 2026) - Real-time cancellation guides
+    - **Web Search Integration** - AI searches the web to find current cancellation procedures for ANY subscription
+    - **Cancel URL Auto-Fill** - When adding a subscription, AI automatically fills in the Cancel URL based on service name
+    - **Database Caching** - Results cached for 24 hours to reduce API calls
+    - **Verification Indicators** - Cancel Kit modal shows "Last verified", confidence badge, and source
+    - **URL Verification** - Links are verified before being returned to ensure they're still valid
+    - New library: `/lib/cancel-kit-ai.ts` for smart AI logic
+    - New API: `/api/subscriptions/lookup-service` for auto-fill functionality
+    - Database migration: `/supabase/migrations/004_cancel_guides.sql` for caching
+    - Updated Cancel Kit modal with verification metadata display
+    - Updated Add Subscription modal with auto-fill Cancel URL (with loading spinner and "AI-suggested" badge)
 
 ### Known Issues / TODO:
 - Email forwarding via Resend is less reliable than Gmail API (forwarded emails lose original sender info)
@@ -227,6 +238,7 @@ Required in `.env.local`:
   - `/supabase/migrations/001_subscriptions.sql` for subscriptions tables
   - `/supabase/migrations/002_cases.sql` for cases tables
   - `/supabase/migrations/003_vault.sql` for vault tables
+  - `/supabase/migrations/004_cancel_guides.sql` for smart cancel kit cache
 
 ### Premium Upgrade Plan (COMPLETE):
 - **Phase 1: Subscriptions** ✅ DONE - "Netflix charges tomorrow" alerts

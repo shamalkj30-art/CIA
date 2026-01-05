@@ -1,55 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-import type { CancelKit, CancelStep, Subscription } from '@/lib/types'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
-
-// Known cancellation info for popular services
-const KNOWN_CANCEL_INFO: Record<string, { cancel_url?: string; steps: CancelStep[] }> = {
-  netflix: {
-    cancel_url: 'https://www.netflix.com/cancelplan',
-    steps: [
-      { step_number: 1, title: 'Go to Account', description: 'Sign in to Netflix and click your profile icon, then select "Account"', action_type: 'navigate', action_url: 'https://www.netflix.com/youraccount' },
-      { step_number: 2, title: 'Cancel Membership', description: 'Click "Cancel Membership" under Membership & Billing', action_type: 'click' },
-      { step_number: 3, title: 'Confirm Cancellation', description: 'Click "Finish Cancellation" to confirm. You can still watch until your billing period ends.', action_type: 'click' },
-    ],
-  },
-  spotify: {
-    cancel_url: 'https://www.spotify.com/account/subscription/',
-    steps: [
-      { step_number: 1, title: 'Go to Subscription', description: 'Log in to your Spotify account and go to your Subscription page', action_type: 'navigate', action_url: 'https://www.spotify.com/account/subscription/' },
-      { step_number: 2, title: 'Change Plan', description: 'Click "Change plan" and then scroll down', action_type: 'click' },
-      { step_number: 3, title: 'Cancel Premium', description: 'Click "Cancel Premium" at the bottom. Your premium continues until the billing period ends.', action_type: 'click' },
-    ],
-  },
-  'amazon prime': {
-    cancel_url: 'https://www.amazon.com/mc/pipelines/cancelPrime',
-    steps: [
-      { step_number: 1, title: 'Go to Prime Membership', description: 'Sign in to Amazon and go to your Prime Membership page', action_type: 'navigate', action_url: 'https://www.amazon.com/mc/pipelines/cancelPrime' },
-      { step_number: 2, title: 'End Membership', description: 'Click "End membership and benefits"', action_type: 'click' },
-      { step_number: 3, title: 'Confirm', description: 'Follow the prompts and confirm cancellation. Select refund option if eligible.', action_type: 'click' },
-    ],
-  },
-  'disney+': {
-    cancel_url: 'https://www.disneyplus.com/account/subscription',
-    steps: [
-      { step_number: 1, title: 'Go to Account', description: 'Log in to Disney+ and go to Account settings', action_type: 'navigate', action_url: 'https://www.disneyplus.com/account' },
-      { step_number: 2, title: 'Select Subscription', description: 'Click on your subscription under "Subscription"', action_type: 'click' },
-      { step_number: 3, title: 'Cancel Subscription', description: 'Click "Cancel Subscription" and follow the prompts to confirm', action_type: 'click' },
-    ],
-  },
-  hbo: {
-    cancel_url: 'https://www.max.com/account/subscription',
-    steps: [
-      { step_number: 1, title: 'Go to Settings', description: 'Log in to Max (formerly HBO Max) and go to Settings', action_type: 'navigate', action_url: 'https://www.max.com/settings' },
-      { step_number: 2, title: 'Manage Subscription', description: 'Click "Subscription" under your account', action_type: 'click' },
-      { step_number: 3, title: 'Cancel', description: 'Click "Cancel Subscription" and confirm your choice', action_type: 'click' },
-    ],
-  },
-}
+import { searchCancellationInfo } from '@/lib/cancel-kit-ai'
+import type { CancelKit, CancelStep, Subscription, CancelGuide } from '@/lib/types'
 
 // Generate cancel kit for subscription
 export async function GET(
@@ -77,23 +29,64 @@ export async function GET(
   }
 
   const sub = subscription as Subscription
+  const merchantNormalized = sub.merchant.toLowerCase().trim()
 
-  // Check if we have known cancel info for this merchant
-  const merchantLower = sub.merchant.toLowerCase()
-  const knownInfo = Object.entries(KNOWN_CANCEL_INFO).find(([key]) =>
-    merchantLower.includes(key)
-  )?.[1]
+  // Check cache first
+  const { data: cachedGuide } = await supabase
+    .from('cancel_guides')
+    .select('*')
+    .eq('merchant_normalized', merchantNormalized)
+    .single()
 
   let steps: CancelStep[]
   let cancel_url = sub.cancel_url
+  let support_email = sub.support_email
+  let support_phone = sub.support_phone
+  let verified_at: string
+  let source: 'web_search' | 'cached' | 'ai_generated'
+  let confidence: 'high' | 'medium' | 'low'
 
-  if (knownInfo) {
-    // Use known cancellation steps
-    steps = knownInfo.steps
-    cancel_url = cancel_url || knownInfo.cancel_url || null
+  const guide = cachedGuide as CancelGuide | null
+  const isExpired = guide ? new Date(guide.expires_at) < new Date() : true
+
+  if (guide && !isExpired) {
+    // Use cached guide
+    steps = guide.steps as CancelStep[]
+    cancel_url = cancel_url || guide.cancel_url
+    support_email = support_email || guide.support_email
+    support_phone = support_phone || guide.support_phone
+    verified_at = guide.verified_at
+    source = 'cached'
+    confidence = guide.confidence
   } else {
-    // Generate generic steps with AI assistance
-    steps = await generateCancelSteps(sub)
+    // Fetch fresh data using smart AI
+    const result = await searchCancellationInfo(sub.merchant)
+
+    steps = result.steps
+    cancel_url = cancel_url || result.cancel_url
+    support_email = support_email || result.support_email
+    support_phone = support_phone || result.support_phone
+    verified_at = result.verified_at
+    source = result.source
+    confidence = result.confidence
+
+    // Cache the result
+    await supabase
+      .from('cancel_guides')
+      .upsert({
+        merchant: sub.merchant,
+        merchant_normalized: merchantNormalized,
+        steps: steps,
+        cancel_url: result.cancel_url,
+        support_email: result.support_email,
+        support_phone: result.support_phone,
+        source: result.source,
+        confidence: result.confidence,
+        verified_at: result.verified_at,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+      }, {
+        onConflict: 'merchant',
+      })
   }
 
   // Generate cancellation message draft
@@ -104,79 +97,16 @@ export async function GET(
     steps,
     draft_message,
     merchant_contact: {
-      email: sub.support_email,
-      phone: sub.support_phone,
+      email: support_email,
+      phone: support_phone,
       cancel_url,
     },
+    verified_at,
+    source,
+    confidence,
   }
 
   return NextResponse.json(cancelKit)
-}
-
-async function generateCancelSteps(subscription: Subscription): Promise<CancelStep[]> {
-  try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `Generate 3-4 generic steps for cancelling a subscription to "${subscription.merchant}"${subscription.plan_name ? ` (${subscription.plan_name} plan)` : ''}.
-
-Return as a JSON array of steps with this structure:
-[
-  {
-    "step_number": 1,
-    "title": "Short title",
-    "description": "Clear description of what to do",
-    "action_type": "navigate|click|call|email|wait"
-  }
-]
-
-Be concise and practical. If you don't know the specific process, provide generic subscription cancellation steps.`,
-        },
-      ],
-    })
-
-    const content = message.content[0]
-    if (content.type === 'text') {
-      // Extract JSON from response
-      const jsonMatch = content.text.match(/\[[\s\S]*\]/)
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0])
-      }
-    }
-  } catch (error) {
-    console.error('Error generating cancel steps:', error)
-  }
-
-  // Fallback generic steps
-  return [
-    {
-      step_number: 1,
-      title: 'Log in to your account',
-      description: `Go to ${subscription.merchant}'s website and sign in to your account`,
-      action_type: 'navigate',
-    },
-    {
-      step_number: 2,
-      title: 'Find subscription settings',
-      description: 'Look for "Account", "Settings", or "Subscription" in the menu',
-      action_type: 'navigate',
-    },
-    {
-      step_number: 3,
-      title: 'Cancel subscription',
-      description: 'Click "Cancel subscription" or "End membership" and follow the prompts',
-      action_type: 'click',
-    },
-    {
-      step_number: 4,
-      title: 'Confirm cancellation',
-      description: 'Check your email for confirmation. Save it as proof of cancellation.',
-      action_type: 'wait',
-    },
-  ]
 }
 
 function generateCancelMessage(subscription: Subscription): string {
