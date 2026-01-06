@@ -816,6 +816,28 @@ a {
   animation-play-state: paused;
 }
 
+/* Subscription marquee - faster, bidirectional */
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+.animate-marquee-reverse {
+  animation: marquee-reverse 40s linear infinite;
+}
+
+.animate-marquee-reverse:hover {
+  animation-play-state: paused;
+}
+
 /* Subtle pulse for icons */
 @keyframes pulse-subtle {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -907,6 +929,8 @@ a {
   .animate-float-slow,
   .animate-float-delayed,
   .marquee-content,
+  .animate-marquee,
+  .animate-marquee-reverse,
   .gradient-border::before {
     animation: none;
   }

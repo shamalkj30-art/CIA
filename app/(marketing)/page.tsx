@@ -1,701 +1,875 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { Button, Section, Page, Card, Badge } from '@/components/ui'
-import { ScrollReveal } from '@/components/ScrollReveal'
+import './landing.css'
 
 export default function HomePage() {
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [headerScrolled, setHeaderScrolled] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [activeSecurityAccordion, setActiveSecurityAccordion] = useState<number | null>(null)
+  const [activeFaqAccordion, setActiveFaqAccordion] = useState<number | null>(null)
+  const [billingAnnual, setBillingAnnual] = useState(false)
+  const [formSubmitted, setFormSubmitted] = useState(false)
+  const [emailError, setEmailError] = useState(false)
+  const [email, setEmail] = useState('')
+  const [goal, setGoal] = useState('')
+  const [updates, setUpdates] = useState(false)
+
+  // Intersection Observer for fade-up animations
+  useEffect(() => {
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible')
+        }
+      })
+    }, observerOptions)
+
+    document.querySelectorAll('.fade-up').forEach(el => {
+      observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
+  // Scroll listener for header
+  useEffect(() => {
+    const handleScroll = () => {
+      setHeaderScrolled(window.scrollY > 100)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // Close mobile menu on body scroll lock
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [mobileMenuOpen])
+
+  const closeMobileMenu = () => setMobileMenuOpen(false)
+
+  const handleFormSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setEmailError(true)
+      return
+    }
+    setEmailError(false)
+    setFormSubmitted(true)
+  }
+
+  const openDemo = () => {
+    alert('Demo video coming soon! For now, explore the features on this page.')
+  }
+
+  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault()
+    const target = document.querySelector(id)
+    if (target) {
+      const headerHeight = 80
+      const targetPosition = target.getBoundingClientRect().top + window.scrollY - headerHeight
+      window.scrollTo({ top: targetPosition, behavior: 'smooth' })
+    }
+    closeMobileMenu()
+  }
+
+  const securityAccordionItems = [
+    { title: 'What Cyncro reads', content: "Purchase confirmations, invoices, and subscription signals—based on the integrations you enable. We don't scan personal emails, messages, or unrelated content." },
+    { title: 'What Cyncro does not do', content: "Cyncro never initiates payments, changes your accounts, messages your contacts, or accesses data beyond what's needed for the features you use." },
+    { title: 'How exports work', content: "You select items, you generate the pack, you share it. Cyncro doesn't automatically send your data anywhere—exports are always user-initiated." },
+    { title: 'Access controls', content: 'Revoke access inside the app and via your provider settings at any time. When you disconnect, Cyncro stops accessing that source immediately.' }
+  ]
+
+  const faqItems = [
+    { question: 'How does Cyncro detect subscriptions?', answer: 'It looks for recurring payment signals and subscription confirmations (based on what you connect), then suggests candidates for you to approve.' },
+    { question: 'Can I use Cyncro without connecting anything?', answer: 'Yes. Manual mode supports subscriptions, receipts, and organization from day one.' },
+    { question: 'What receipts can Cyncro extract?', answer: 'Order confirmations, invoices, and purchase emails. You can also upload receipts manually.' },
+    { question: 'What if Cyncro mislabels something?', answer: 'You can edit categories, rename items, and add notes. The system improves as you correct it.' },
+    { question: 'Can I export receipts for insurance or warranty claims?', answer: 'Yes—Vault helps you find and organize; Ledger adds one-click Claims Pack exports.' },
+    { question: 'How do I revoke access?', answer: 'Disconnect inside the app and revoke permissions through your provider settings at any time.' }
+  ]
 
   return (
-    <>
-      {/* HERO - Dark gradient background with floating elements */}
-      <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-[#09090B]">
-        {/* Animated gradient orbs */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-gradient-to-r from-indigo-600/30 to-purple-600/30 rounded-full blur-[100px] animate-float-slow" />
-          <div className="absolute bottom-1/4 -right-20 w-[400px] h-[400px] bg-gradient-to-r from-orange-500/20 to-pink-500/20 rounded-full blur-[80px] animate-float-delayed" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-violet-600/10 to-indigo-600/10 rounded-full blur-[120px]" />
+    <div className="desert-noir">
+      {/* Ambient Background */}
+      <div className="ambient-bg" />
+
+      {/* Header */}
+      <header className={`header ${headerScrolled ? 'scrolled' : ''}`} id="header">
+        <div className="container header-inner">
+          <Link href="/" className="logo">
+            <div className="logo-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            Cyncro
+          </Link>
+
+          <nav className="nav">
+            <ul className="nav-links">
+              <li><a href="#features" className="nav-link" onClick={(e) => scrollToSection(e, '#features')}>Product</a></li>
+              <li><a href="#how-it-works" className="nav-link" onClick={(e) => scrollToSection(e, '#how-it-works')}>How it works</a></li>
+              <li><a href="#security" className="nav-link" onClick={(e) => scrollToSection(e, '#security')}>Security</a></li>
+              <li><a href="#pricing" className="nav-link" onClick={(e) => scrollToSection(e, '#pricing')}>Pricing</a></li>
+              <li><a href="#faq" className="nav-link" onClick={(e) => scrollToSection(e, '#faq')}>FAQ</a></li>
+            </ul>
+
+            <div className="nav-buttons">
+              <button className="btn btn-secondary" onClick={openDemo}>Watch 45s demo</button>
+              <Link href="/signup" className="btn btn-primary">Get early access</Link>
+            </div>
+          </nav>
+
+          <button className="menu-toggle" aria-label="Toggle menu" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
         </div>
+      </header>
 
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      {/* Mobile Menu */}
+      <div className={`mobile-menu ${mobileMenuOpen ? 'active' : ''}`}>
+        <ul className="mobile-nav-links">
+          <li><a href="#features" onClick={(e) => scrollToSection(e, '#features')}>Product</a></li>
+          <li><a href="#how-it-works" onClick={(e) => scrollToSection(e, '#how-it-works')}>How it works</a></li>
+          <li><a href="#security" onClick={(e) => scrollToSection(e, '#security')}>Security</a></li>
+          <li><a href="#pricing" onClick={(e) => scrollToSection(e, '#pricing')}>Pricing</a></li>
+          <li><a href="#faq" onClick={(e) => scrollToSection(e, '#faq')}>FAQ</a></li>
+        </ul>
+        <div className="mobile-menu-footer">
+          <p>Privacy-first. Manual mode always available.</p>
+          <div className="mobile-menu-buttons">
+            <button className="btn btn-secondary" onClick={openDemo}>Watch 45s demo</button>
+            <Link href="/signup" className="btn btn-primary" onClick={closeMobileMenu}>Get early access</Link>
+          </div>
+        </div>
+      </div>
 
-        <Page size="wide" className="relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            {/* Left: Copy */}
-            <div>
-              <ScrollReveal direction="up" delay={0}>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm mb-8">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                  <span className="text-sm text-white/70">Now with Vault & Insurance Packs</span>
-                </div>
-              </ScrollReveal>
+      {/* Hero Section */}
+      <section className="hero">
+        <div className="container hero-content">
+          <div className="hero-text">
+            <h1 className="hero-headline fade-up">Subscriptions and receipts—organized automatically.</h1>
+            <p className="hero-subheadline fade-up stagger-1">Cyncro is a smart expense hub that detects subscriptions, saves receipts from your inbox, and keeps every important purchase instantly retrievable—so warranties, claims, and refunds take minutes, not hours.</p>
 
-              <ScrollReveal direction="up" delay={100}>
-                <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-[-0.03em] text-white mb-6 leading-[1.05]">
-                  Your{' '}
-                  <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    Personal Proof
-                  </span>{' '}
-                  & Money OS
-                </h1>
-              </ScrollReveal>
-
-              <ScrollReveal direction="up" delay={200}>
-                <p className="text-xl text-white/60 mb-10 max-w-lg leading-relaxed">
-                  Auto-capture receipts. Track warranties & subscriptions. Generate claim packets. Never lose money on expired protection again.
-                </p>
-              </ScrollReveal>
-
-              <ScrollReveal direction="up" delay={300}>
-                <div className="flex flex-col sm:flex-row gap-4 mb-10">
-                  <Link
-                    href="/signup"
-                    className="inline-flex items-center justify-center px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold text-lg shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.02] transition-all"
-                  >
-                    Start free
-                    <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </Link>
-                  <Link
-                    href="#features"
-                    className="inline-flex items-center justify-center px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-semibold text-lg hover:bg-white/10 transition-all"
-                  >
-                    See features
-                  </Link>
-                </div>
-              </ScrollReveal>
-
-              <ScrollReveal direction="up" delay={400}>
-                <div className="flex items-center gap-8 text-sm text-white/40">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span>Free forever plan</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span>No credit card</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span>Gmail sync</span>
-                  </div>
-                </div>
-              </ScrollReveal>
+            <div className="hero-ctas fade-up stagger-2">
+              <Link href="/signup" className="btn btn-primary btn-lg">Get early access</Link>
+              <button className="btn btn-secondary btn-lg" onClick={openDemo}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Watch 45s demo
+              </button>
             </div>
 
-            {/* Right: App Preview */}
-            <ScrollReveal direction="scale" delay={200}>
-              <div className="relative">
-                {/* Glow behind */}
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-3xl blur-2xl scale-95" />
-
-                {/* App mockup card */}
-                <div className="relative bg-[#18181B] rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
-                  {/* App header */}
-                  <div className="flex items-center gap-3 px-6 py-4 border-b border-white/10">
-                    <div className="flex gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
-                      <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                      <div className="w-3 h-3 rounded-full bg-green-500" />
-                    </div>
-                    <div className="flex-1 flex justify-center">
-                      <div className="px-4 py-1.5 bg-white/5 rounded-lg text-sm text-white/50">
-                        cyncro.app/dashboard
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* App content preview */}
-                  <div className="p-6 space-y-4">
-                    {/* Stats row */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-xs text-white/40 mb-1">Purchases</p>
-                        <p className="text-2xl font-bold text-white">47</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-xs text-white/40 mb-1">Subscriptions</p>
-                        <p className="text-2xl font-bold text-white">12</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-xs text-white/40 mb-1">Vault Items</p>
-                        <p className="text-2xl font-bold text-white">89</p>
-                      </div>
-                    </div>
-
-                    {/* Alert card */}
-                    <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                          <span className="text-xl">⚡</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-white">Netflix charges tomorrow</p>
-                          <p className="text-xs text-white/50">kr 169/month • Renews Jan 6</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Purchase items */}
-                    <div className="space-y-2">
-                      {[
-                        { name: 'MacBook Pro 14"', merchant: 'Apple Store', status: 'Claim Ready', color: 'green' },
-                        { name: 'Sony WH-1000XM5', merchant: 'Elkjøp', status: 'Expiring Soon', color: 'orange' },
-                      ].map((item) => (
-                        <div key={item.name} className="flex items-center justify-between bg-white/5 rounded-xl p-4">
-                          <div>
-                            <p className="text-sm font-medium text-white">{item.name}</p>
-                            <p className="text-xs text-white/50">{item.merchant}</p>
-                          </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            item.color === 'green' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'
-                          }`}>
-                            {item.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-        </Page>
-      </section>
-
-      {/* STATS BAR */}
-      <section className="py-12 bg-[var(--surface)] border-y border-[var(--border)]">
-        <Page>
-          <div className="flex flex-wrap items-center justify-center gap-12 lg:gap-20">
-            {[
-              { value: '10K+', label: 'Receipts tracked' },
-              { value: '€2.3M', label: 'Warranties protected' },
-              { value: '847', label: 'Claims filed' },
-              { value: '99.2%', label: 'AI accuracy' },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
-                  {stat.value}
-                </p>
-                <p className="text-sm text-[var(--text-muted)] mt-1">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </Page>
-      </section>
-
-      {/* PROBLEM SECTION */}
-      <Section spacing="normal" className="mesh-gradient">
-        <Page>
-          <ScrollReveal direction="up">
-            <div className="max-w-3xl mx-auto text-center mb-16">
-              <p className="text-sm font-semibold text-[var(--primary)] uppercase tracking-wider mb-4">The Problem</p>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[var(--text-primary)] mb-6 tracking-tight">
-                You're losing money every year
-              </h2>
-              <p className="text-xl text-[var(--text-secondary)]">
-                Warranties expire. Subscriptions auto-renew. Receipts get lost. Sound familiar?
-              </p>
+            <div className="hero-trust fade-up stagger-3">
+              <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>You choose what to connect. Use manual mode anytime. Revoke access whenever you want.</span>
             </div>
-          </ScrollReveal>
-
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
-              { icon: '📦', stat: '€847', label: 'Average lost to expired warranties per year', color: 'red' },
-              { icon: '🔄', stat: '€312', label: 'Wasted on forgotten subscriptions', color: 'orange' },
-              { icon: '📄', stat: '73%', label: 'Of people can\'t find receipts when needed', color: 'yellow' },
-            ].map((item, i) => (
-              <ScrollReveal key={item.label} direction="up" delay={i * 100}>
-                <div className="text-center p-8 rounded-2xl bg-[var(--surface)] border border-[var(--border)] hover-lift">
-                  <span className="text-4xl mb-4 block">{item.icon}</span>
-                  <p className={`text-4xl font-bold mb-2 ${
-                    item.color === 'red' ? 'text-red-500' :
-                    item.color === 'orange' ? 'text-orange-500' : 'text-yellow-500'
-                  }`}>{item.stat}</p>
-                  <p className="text-sm text-[var(--text-muted)]">{item.label}</p>
-                </div>
-              </ScrollReveal>
-            ))}
           </div>
-        </Page>
-      </Section>
 
-      {/* FEATURES - THE 4 PILLARS */}
-      <Section id="features" spacing="loose" bg="subtle">
-        <Page>
-          <ScrollReveal direction="up">
-            <div className="text-center mb-16">
-              <p className="text-sm font-semibold text-[var(--primary)] uppercase tracking-wider mb-4">Features</p>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[var(--text-primary)] mb-6 tracking-tight">
-                Everything you need to protect your purchases
-              </h2>
-            </div>
-          </ScrollReveal>
-
-          {/* Feature 1: Purchases */}
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center mb-24">
-            <ScrollReveal direction="right">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-sm font-medium mb-6">
-                  <span>📦</span> Purchases
+          <div className="hero-preview fade-up stagger-2">
+            <div className="preview-container">
+              {/* Active Subscriptions Card */}
+              <div className="preview-card">
+                <div className="preview-card-header">
+                  <span className="preview-card-title">Active subscriptions</span>
+                  <span className="preview-badge">Detected renewals</span>
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-4">
-                  Auto-capture every receipt
-                </h3>
-                <p className="text-lg text-[var(--text-secondary)] mb-6">
-                  Connect Gmail and we'll automatically detect order confirmations. AI extracts merchant, items, prices, and warranty info. Upload photos or forward emails for manual adds.
-                </p>
-                <ul className="space-y-3">
-                  {['Gmail auto-sync', 'AI-powered extraction', 'Photo & PDF upload', 'Warranty deadline tracking'].map((item) => (
-                    <li key={item} className="flex items-center gap-3 text-[var(--text-secondary)]">
-                      <svg className="w-5 h-5 text-[var(--success)]" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                <div className="subscription-chips">
+                  <div className="sub-chip">
+                    <div className="sub-chip-icon">N</div>
+                    <span>Netflix</span>
+                    <span className="sub-chip-amount">$15.99</span>
+                  </div>
+                  <div className="sub-chip">
+                    <div className="sub-chip-icon">S</div>
+                    <span>Spotify</span>
+                    <span className="sub-chip-amount">$10.99</span>
+                  </div>
+                  <div className="sub-chip">
+                    <div className="sub-chip-icon">A</div>
+                    <span>Adobe CC</span>
+                    <span className="sub-chip-amount">$54.99</span>
+                  </div>
+                  <div className="sub-chip">
+                    <div className="sub-chip-icon">G</div>
+                    <span>Gym</span>
+                    <span className="sub-chip-amount">$29.00</span>
+                  </div>
+                </div>
+                <div className="sub-total">
+                  <span className="sub-total-label">Monthly total</span>
+                  <span className="sub-total-amount">$110.97</span>
+                </div>
               </div>
-            </ScrollReveal>
-            <ScrollReveal direction="left">
-              <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="font-semibold text-[var(--text-primary)]">Recent Purchases</h4>
-                  <span className="text-xs text-[var(--text-muted)]">47 total</span>
+
+              {/* Receipt Vault Card */}
+              <div className="preview-card">
+                <div className="preview-card-header">
+                  <span className="preview-card-title">Receipt Vault</span>
+                  <span className="preview-badge green">Receipt verified</span>
                 </div>
-                <div className="space-y-3">
-                  {[
-                    { name: 'iPhone 15 Pro', merchant: 'Apple Store', price: 'kr 13,990', badge: 'Claim Ready', badgeColor: 'green' },
-                    { name: 'AirPods Pro', merchant: 'Elkjøp', price: 'kr 2,990', badge: 'AI Verified', badgeColor: 'indigo' },
-                    { name: 'Standing Desk', merchant: 'IKEA', price: 'kr 4,999', badge: 'Needs Review', badgeColor: 'orange' },
-                  ].map((item) => (
-                    <div key={item.name} className="flex items-center justify-between p-4 rounded-xl bg-[var(--surface-subtle)]">
-                      <div>
-                        <p className="font-medium text-[var(--text-primary)]">{item.name}</p>
-                        <p className="text-sm text-[var(--text-muted)]">{item.merchant} • {item.price}</p>
-                      </div>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        item.badgeColor === 'green' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
-                        item.badgeColor === 'indigo' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' :
-                        'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400'
-                      }`}>
-                        {item.badge}
-                      </span>
+                <div className="receipt-grid">
+                  <div className="receipt-item">
+                    <span className="receipt-item-icon">📱</span>
+                    <span>iPhone 15</span>
+                  </div>
+                  <div className="receipt-item">
+                    <span className="receipt-item-icon">💻</span>
+                    <span>MacBook</span>
+                  </div>
+                  <div className="receipt-item">
+                    <span className="receipt-item-icon">🎧</span>
+                    <span>AirPods</span>
+                  </div>
+                  <div className="receipt-item">
+                    <span className="receipt-item-icon">📺</span>
+                    <span>LG TV</span>
+                  </div>
+                  <div className="receipt-item">
+                    <span className="receipt-item-icon">🧊</span>
+                    <span>Fridge</span>
+                  </div>
+                  <div className="receipt-item">
+                    <span className="receipt-item-icon">🛋️</span>
+                    <span>Sofa</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Claims Pack Card */}
+              <div className="preview-card">
+                <div className="preview-card-header">
+                  <span className="preview-card-title">Claims Pack</span>
+                  <span className="preview-badge green">Export ready</span>
+                </div>
+                <div className="claims-list">
+                  <div className="claims-item">
+                    <div className="claims-check">
+                      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-
-          {/* Feature 2: Subscriptions */}
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center mb-24">
-            <ScrollReveal direction="right" className="lg:order-2">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-sm font-medium mb-6">
-                  <span>🔄</span> Subscriptions
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-4">
-                  "Netflix charges tomorrow" alerts
-                </h3>
-                <p className="text-lg text-[var(--text-secondary)] mb-6">
-                  Track every recurring payment. Get notified before charges hit. Generate AI-powered cancel kits with step-by-step instructions when you're ready to cut the cord.
-                </p>
-                <ul className="space-y-3">
-                  {['Charge date alerts', 'Monthly spend tracking', 'AI cancel kits', 'Price change detection'].map((item) => (
-                    <li key={item} className="flex items-center gap-3 text-[var(--text-secondary)]">
-                      <svg className="w-5 h-5 text-[var(--success)]" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </ScrollReveal>
-            <ScrollReveal direction="left" className="lg:order-1">
-              <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="font-semibold text-[var(--text-primary)]">Active Subscriptions</h4>
-                  <span className="text-sm font-medium text-[var(--text-muted)]">kr 1,247/mo</span>
-                </div>
-                <div className="space-y-3">
-                  {[
-                    { name: 'Netflix', price: 'kr 169', next: 'Tomorrow', color: '#E50914', urgent: true },
-                    { name: 'Spotify', price: 'kr 119', next: 'Jan 15', color: '#1DB954', urgent: false },
-                    { name: 'Adobe CC', price: 'kr 599', next: 'Jan 20', color: '#FF0000', urgent: false },
-                  ].map((item) => (
-                    <div key={item.name} className={`flex items-center justify-between p-4 rounded-xl ${item.urgent ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-[var(--surface-subtle)]'}`}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${item.color}20` }}>
-                          <div className="w-6 h-6 rounded" style={{ backgroundColor: item.color }} />
-                        </div>
-                        <div>
-                          <p className="font-medium text-[var(--text-primary)]">{item.name}</p>
-                          <p className="text-sm text-[var(--text-muted)]">{item.price}/mo</p>
-                        </div>
-                      </div>
-                      <span className={`text-sm font-medium ${item.urgent ? 'text-orange-500' : 'text-[var(--text-muted)]'}`}>
-                        {item.next}
-                      </span>
+                    <span>Purchase receipt</span>
+                  </div>
+                  <div className="claims-item">
+                    <div className="claims-check">
+                      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-
-          {/* Feature 3: Cases */}
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center mb-24">
-            <ScrollReveal direction="right">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm font-medium mb-6">
-                  <span>📋</span> Cases
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-4">
-                  Returns & complaints made easy
-                </h3>
-                <p className="text-lg text-[var(--text-secondary)] mb-6">
-                  Open a case, and AI generates professional messages in your language. Track status, set follow-up reminders, and escalate when needed. Norwegian consumer law built-in.
-                </p>
-                <ul className="space-y-3">
-                  {['AI-generated messages', 'Multi-language support', '3-day follow-up reminders', 'Escalation templates'].map((item) => (
-                    <li key={item} className="flex items-center gap-3 text-[var(--text-secondary)]">
-                      <svg className="w-5 h-5 text-[var(--success)]" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </ScrollReveal>
-            <ScrollReveal direction="left">
-              <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="font-semibold text-[var(--text-primary)]">Active Case</h4>
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400">Waiting</span>
-                </div>
-                <div className="mb-4">
-                  <p className="font-medium text-[var(--text-primary)]">Return: Defective Headphones</p>
-                  <p className="text-sm text-[var(--text-muted)]">Sony WH-1000XM5 • Elkjøp</p>
-                </div>
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-[var(--text-muted)]">Created case</span>
-                    <span className="text-[var(--text-muted)] ml-auto">Jan 2</span>
+                    <span>Warranty document</span>
                   </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-[var(--text-muted)]">Sent initial message</span>
-                    <span className="text-[var(--text-muted)] ml-auto">Jan 2</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                    <span className="text-[var(--text-primary)]">Awaiting response</span>
-                    <span className="text-[var(--text-muted)] ml-auto">Now</span>
+                  <div className="claims-item">
+                    <div className="claims-check">
+                      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span>Serial number</span>
                   </div>
                 </div>
-                <button className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-medium hover:bg-[var(--primary-hover)] transition-colors">
-                  Send Follow-up
+                <button className="claims-export-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  Export Claims Pack
                 </button>
               </div>
-            </ScrollReveal>
-          </div>
-
-          {/* Feature 4: Vault */}
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <ScrollReveal direction="right" className="lg:order-2">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-6">
-                  <span>🗄️</span> Vault
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-4">
-                  Your document fortress
-                </h3>
-                <p className="text-lg text-[var(--text-secondary)] mb-6">
-                  Organize receipts, warranties, manuals, insurance docs, and contracts in secure libraries. Generate insurance claim packs organized by room with one click.
-                </p>
-                <ul className="space-y-3">
-                  {['5 document libraries', '8 insurance rooms', 'One-click claim packs', 'Expiry tracking'].map((item) => (
-                    <li key={item} className="flex items-center gap-3 text-[var(--text-secondary)]">
-                      <svg className="w-5 h-5 text-[var(--success)]" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </ScrollReveal>
-            <ScrollReveal direction="left" className="lg:order-1">
-              <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="font-semibold text-[var(--text-primary)]">Insurance Vault</h4>
-                  <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">kr 847,000 total</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { room: 'Kitchen', icon: '🍳', items: 12, value: 'kr 145K' },
-                    { room: 'Living Room', icon: '🛋️', items: 8, value: 'kr 285K' },
-                    { room: 'Office', icon: '💼', items: 15, value: 'kr 189K' },
-                    { room: 'Bedroom', icon: '🛏️', items: 6, value: 'kr 78K' },
-                  ].map((room) => (
-                    <div key={room.room} className="p-4 rounded-xl bg-[var(--surface-subtle)] hover:bg-[var(--border)] transition-colors cursor-pointer">
-                      <span className="text-2xl mb-2 block">{room.icon}</span>
-                      <p className="font-medium text-[var(--text-primary)]">{room.room}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{room.items} items • {room.value}</p>
-                    </div>
-                  ))}
-                </div>
-                <button className="w-full mt-4 py-3 rounded-xl bg-emerald-500 text-white font-medium hover:bg-emerald-600 transition-colors">
-                  Generate Claim Pack
-                </button>
-              </div>
-            </ScrollReveal>
-          </div>
-        </Page>
-      </Section>
-
-      {/* EVIDENCE MODE HIGHLIGHT */}
-      <Section spacing="normal" className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5" />
-        <Page className="relative">
-          <div className="max-w-4xl mx-auto text-center">
-            <ScrollReveal direction="up">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-sm font-medium mb-6">
-                <span>✨</span> Evidence Mode
-              </div>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[var(--text-primary)] mb-6 tracking-tight">
-                AI-verified, claim-ready proof
-              </h2>
-              <p className="text-xl text-[var(--text-secondary)] mb-12 max-w-2xl mx-auto">
-                Every purchase shows a Proof Score. See what's claim-ready, what needs review, and exactly what's missing for complete documentation.
-              </p>
-            </ScrollReveal>
-
-            <ScrollReveal direction="up" delay={200}>
-              <div className="grid sm:grid-cols-3 gap-4">
-                {[
-                  { status: 'Claim Ready', color: 'green', icon: '✓', desc: 'All evidence present' },
-                  { status: 'Almost Ready', color: 'yellow', icon: '◐', desc: 'Missing 1-2 fields' },
-                  { status: 'Needs Review', color: 'orange', icon: '!', desc: 'Auto-detected, verify' },
-                ].map((item) => (
-                  <div key={item.status} className={`p-6 rounded-2xl border ${
-                    item.color === 'green' ? 'bg-green-500/5 border-green-500/20' :
-                    item.color === 'yellow' ? 'bg-yellow-500/5 border-yellow-500/20' :
-                    'bg-orange-500/5 border-orange-500/20'
-                  }`}>
-                    <div className={`w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold ${
-                      item.color === 'green' ? 'bg-green-500/20 text-green-600 dark:text-green-400' :
-                      item.color === 'yellow' ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400' :
-                      'bg-orange-500/20 text-orange-600 dark:text-orange-400'
-                    }`}>
-                      {item.icon}
-                    </div>
-                    <p className="font-semibold text-[var(--text-primary)] mb-1">{item.status}</p>
-                    <p className="text-sm text-[var(--text-muted)]">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </ScrollReveal>
-          </div>
-        </Page>
-      </Section>
-
-      {/* HOW IT WORKS - SIMPLE */}
-      <Section spacing="normal" bg="surface">
-        <Page>
-          <ScrollReveal direction="up">
-            <div className="text-center mb-16">
-              <p className="text-sm font-semibold text-[var(--primary)] uppercase tracking-wider mb-4">How it works</p>
-              <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] tracking-tight">
-                Three steps to peace of mind
-              </h2>
             </div>
-          </ScrollReveal>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {[
-              { step: '1', title: 'Connect', desc: 'Link your Gmail or upload receipts manually. Takes 30 seconds.' },
-              { step: '2', title: 'Relax', desc: 'AI extracts details, tracks deadlines, and alerts you before things expire.' },
-              { step: '3', title: 'Claim', desc: 'Generate professional claim packets or cancel kits with one click.' },
-            ].map((item, i) => (
-              <ScrollReveal key={item.step} direction="up" delay={i * 100}>
-                <div className="text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-2xl font-bold flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/25">
-                    {item.step}
-                  </div>
-                  <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">{item.title}</h3>
-                  <p className="text-[var(--text-secondary)]">{item.desc}</p>
-                </div>
-              </ScrollReveal>
-            ))}
           </div>
-        </Page>
-      </Section>
-
-      {/* PRICING */}
-      <Section id="pricing" spacing="normal">
-        <Page>
-          <ScrollReveal direction="up">
-            <div className="text-center mb-16">
-              <p className="text-sm font-semibold text-[var(--primary)] uppercase tracking-wider mb-4">Pricing</p>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[var(--text-primary)] mb-4 tracking-tight">
-                Start free, upgrade when ready
-              </h2>
-              <p className="text-lg text-[var(--text-secondary)]">No credit card required</p>
-            </div>
-          </ScrollReveal>
-
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            <ScrollReveal direction="up" delay={0}>
-              <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-8 hover-lift h-full">
-                <div className="text-center mb-8">
-                  <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">Free</h3>
-                  <div className="text-5xl font-bold text-[var(--text-primary)]">$0</div>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">forever</p>
-                </div>
-                <ul className="space-y-4 mb-8">
-                  {['25 purchases', 'Basic warranty tracking', 'Claim packet generation', '5 vault items', 'Email support'].map((f) => (
-                    <li key={f} className="flex items-center gap-3 text-[var(--text-secondary)]">
-                      <svg className="w-5 h-5 text-[var(--success)]" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/signup" className="block w-full py-4 rounded-xl border-2 border-[var(--border)] text-center font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-colors">
-                  Get started
-                </Link>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal direction="up" delay={100}>
-              <div className="gradient-border h-full">
-                <div className="bg-[var(--surface)] rounded-2xl p-8 h-full relative">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-4 py-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium shadow-lg">
-                      Popular
-                    </span>
-                  </div>
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">Pro</h3>
-                    <div className="text-5xl font-bold text-[var(--text-primary)]">$5</div>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">per month</p>
-                  </div>
-                  <ul className="space-y-4 mb-8">
-                    {['Unlimited purchases', 'Gmail auto-sync', 'Subscription tracking', 'Cases & follow-ups', 'Unlimited vault', 'Insurance packs', 'Priority support'].map((f) => (
-                      <li key={f} className="flex items-center gap-3 text-[var(--text-secondary)]">
-                        <svg className="w-5 h-5 text-[var(--success)]" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/signup" className="block w-full py-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-center font-semibold text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all">
-                    Start free trial
-                  </Link>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-        </Page>
-      </Section>
-
-      {/* FAQ */}
-      <Section spacing="normal" bg="subtle">
-        <Page size="narrow">
-          <ScrollReveal direction="up">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] tracking-tight">
-                Questions?
-              </h2>
-            </div>
-          </ScrollReveal>
-
-          <div className="space-y-3">
-            {[
-              { q: 'How does Gmail sync work?', a: 'Connect your Gmail account via OAuth (secure, we never see your password). We scan for order confirmation emails and extract purchase details using AI. You control which purchases to save.' },
-              { q: 'Is my data secure?', a: 'Yes. All data is encrypted at rest and in transit. We never train AI on your personal data, and you can export or delete everything with one click.' },
-              { q: 'What makes a purchase "Claim Ready"?', a: 'A purchase is claim-ready when it has: receipt/proof of purchase, merchant info, purchase date, price, and warranty period. Our Proof Score shows exactly what\'s missing.' },
-              { q: 'Can I cancel anytime?', a: 'Absolutely. No contracts, cancel anytime. Your data remains accessible and exportable even on the free plan.' },
-            ].map((faq, i) => (
-              <ScrollReveal key={i} direction="up" delay={i * 50}>
-                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface)]">
-                  <button
-                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="w-full flex items-center justify-between p-5 text-left hover:bg-[var(--surface-subtle)] transition-colors"
-                  >
-                    <h3 className="font-semibold text-[var(--text-primary)] pr-4">{faq.q}</h3>
-                    <svg
-                      className={`w-5 h-5 text-[var(--text-muted)] flex-shrink-0 transition-transform duration-300 ${openFaq === i ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  <div className={`accordion-content ${openFaq === i ? 'open' : ''}`}>
-                    <div className="accordion-inner">
-                      <p className="px-5 pb-5 text-[var(--text-secondary)] leading-relaxed">{faq.a}</p>
-                    </div>
-                  </div>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-        </Page>
-      </Section>
-
-      {/* FINAL CTA */}
-      <section className="relative py-24 lg:py-32 overflow-hidden bg-[#09090B]">
-        {/* Gradient orbs */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-gradient-to-r from-indigo-600/30 to-purple-600/30 rounded-full blur-[100px]" />
-          <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-full blur-[80px]" />
         </div>
-
-        <Page className="relative z-10">
-          <ScrollReveal direction="up">
-            <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight">
-                Stop losing money on{' '}
-                <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  forgotten protection
-                </span>
-              </h2>
-              <p className="text-xl text-white/60 mb-10">
-                Join thousands protecting their purchases with Cyncro.
-              </p>
-              <Link
-                href="/signup"
-                className="inline-flex items-center justify-center px-10 py-5 rounded-xl bg-white text-[#09090B] font-semibold text-lg shadow-2xl hover:scale-[1.02] transition-all"
-              >
-                Start free today
-                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Link>
-            </div>
-          </ScrollReveal>
-        </Page>
       </section>
-    </>
+
+      {/* Problem Strip */}
+      <section className="problem-strip section">
+        <div className="container">
+          <h2 className="problem-title fade-up">Money leaks quietly. Proof disappears faster.</h2>
+
+          <div className="problem-list">
+            <div className="problem-item fade-up stagger-1">
+              <div className="problem-bullet"></div>
+              <p>Subscriptions pile up—then you forget what you're paying for.</p>
+            </div>
+            <div className="problem-item fade-up stagger-2">
+              <div className="problem-bullet"></div>
+              <p>Receipts vanish into email threads, apps, and old order confirmations.</p>
+            </div>
+            <div className="problem-item fade-up stagger-3">
+              <div className="problem-bullet"></div>
+              <p>When warranty or insurance asks for documentation, you start digging.</p>
+            </div>
+          </div>
+
+          <p className="problem-closing fade-up stagger-4">Cyncro turns the mess into a clean system—without turning you into an accountant.</p>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="features section-lg" id="features">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title fade-up">Everything you need to stay in control—without the busywork.</h2>
+          </div>
+
+          <div className="feature-grid">
+            {/* Feature 1: Subscription Radar */}
+            <div className="feature-card fade-up stagger-1">
+              <div className="feature-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              </div>
+              <h3 className="feature-title">Subscription Radar</h3>
+              <p className="feature-desc">Detect recurring payments and keep renewals visible.</p>
+              <ul className="feature-bullets">
+                <li>Renewal dates and monthly total</li>
+                <li>Duplicate subscriptions flagged</li>
+                <li>Price changes highlighted</li>
+              </ul>
+            </div>
+
+            {/* Feature 2: Receipt Vault */}
+            <div className="feature-card fade-up stagger-2">
+              <div className="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </div>
+              <h3 className="feature-title">Receipt Vault</h3>
+              <p className="feature-desc">Receipts from order confirmations, invoices, and purchase emails—automatically stored.</p>
+              <ul className="feature-bullets">
+                <li>Search by store, date, amount</li>
+                <li>Category tags and notes</li>
+                <li>Attach photos for offline receipts</li>
+              </ul>
+            </div>
+
+            {/* Feature 3: Warranty-Ready Library */}
+            <div className="feature-card fade-up stagger-3">
+              <div className="feature-icon green">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3 className="feature-title">Warranty-Ready Library</h3>
+              <p className="feature-desc">Keep high-value purchases easy to retrieve when it matters.</p>
+              <ul className="feature-bullets">
+                <li>Mac, phone, TV, appliances, more</li>
+                <li>Add warranty details and serial fields</li>
+                <li>"Found it instantly" retrieval flow</li>
+              </ul>
+            </div>
+
+            {/* Feature 4: Claims Pack Export */}
+            <div className="feature-card fade-up stagger-4">
+              <div className="feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <h3 className="feature-title">Claims Pack Export</h3>
+              <p className="feature-desc">Generate clean documentation when insurance asks for proof.</p>
+              <ul className="feature-bullets">
+                <li>Select timeframe + category</li>
+                <li>Export receipts + summary overview</li>
+                <li>Share-ready format</li>
+              </ul>
+            </div>
+
+            {/* Feature 5: Manual Control */}
+            <div className="feature-card fade-up stagger-5">
+              <div className="feature-icon green">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </div>
+              <h3 className="feature-title">Manual Control</h3>
+              <p className="feature-desc">Full value even without integrations.</p>
+              <ul className="feature-bullets">
+                <li>Add subscriptions manually</li>
+                <li>Upload receipts anytime</li>
+                <li>Edit categories and labels</li>
+              </ul>
+            </div>
+
+            {/* Feature 6: Cyncro Intelligence */}
+            <div className="feature-card fade-up stagger-6">
+              <div className="feature-icon">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <h3 className="feature-title">Cyncro Intelligence</h3>
+              <p className="feature-desc">Ask questions in plain language and get actionable answers.</p>
+              <ul className="feature-bullets">
+                <li>"Show subscriptions above $15/month"</li>
+                <li>"Find my iPhone receipt"</li>
+                <li>"List purchases over $500 this year"</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="how-it-works section-lg" id="how-it-works">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title fade-up">Set it up in minutes. Benefit for years.</h2>
+          </div>
+
+          <div className="steps-grid">
+            <div className="step fade-up stagger-1">
+              <div className="step-number">1</div>
+              <h3 className="step-title">Connect</h3>
+              <p className="step-desc">Connect email and/or transactions to detect subscriptions and receipts automatically.</p>
+              <span className="step-optional">Optional</span>
+            </div>
+
+            <div className="step fade-up stagger-2">
+              <div className="step-number">2</div>
+              <h3 className="step-title">Review</h3>
+              <p className="step-desc">Cyncro suggests what it found. You approve, edit, or ignore.</p>
+            </div>
+
+            <div className="step fade-up stagger-3">
+              <div className="step-number">3</div>
+              <h3 className="step-title">Organize</h3>
+              <p className="step-desc">Subscriptions and receipts become a searchable library—clean, categorized, and ready.</p>
+            </div>
+
+            <div className="step fade-up stagger-4">
+              <div className="step-number">4</div>
+              <h3 className="step-title">Use</h3>
+              <p className="step-desc">Export documentation, find warranties fast, and stay ahead of renewals.</p>
+            </div>
+          </div>
+
+          <p className="steps-microcopy fade-up">Manual mode works end-to-end. Connections are optional.</p>
+        </div>
+      </section>
+
+      {/* Security Section */}
+      <section className="security section-lg" id="security">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title fade-up">Built for privacy. Designed for control.</h2>
+          </div>
+
+          <div className="security-columns">
+            <div className="security-col fade-up stagger-1">
+              <div className="security-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+              </div>
+              <h3 className="security-col-title">You choose what connects</h3>
+              <p className="security-col-desc">Email, transactions, both, or neither. Manual mode is always available.</p>
+            </div>
+
+            <div className="security-col fade-up stagger-2">
+              <div className="security-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3 className="security-col-title">Data minimization</h3>
+              <p className="security-col-desc">Cyncro extracts only what's needed for the features you enable—nothing else.</p>
+            </div>
+
+            <div className="security-col fade-up stagger-3">
+              <div className="security-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              </div>
+              <h3 className="security-col-title">Revoke anytime</h3>
+              <p className="security-col-desc">Disconnect, delete, and remove access whenever you want.</p>
+            </div>
+          </div>
+
+          <div className="accordion fade-up">
+            {securityAccordionItems.map((item, index) => (
+              <div key={index} className={`accordion-item ${activeSecurityAccordion === index ? 'active' : ''}`}>
+                <button className="accordion-header" onClick={() => setActiveSecurityAccordion(activeSecurityAccordion === index ? null : index)}>
+                  <span>{item.title}</span>
+                  <svg className="accordion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <div className="accordion-content">
+                  <div className="accordion-body">{item.content}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="security-note fade-up">Designed with privacy-first principles. Formal audits are on our roadmap.</p>
+        </div>
+      </section>
+
+      {/* Use Cases */}
+      <section className="use-cases section-lg">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title fade-up">Made for real life—not spreadsheets.</h2>
+          </div>
+
+          <div className="use-cases-grid">
+            <div className="use-case-card fade-up stagger-1">
+              <div className="use-case-icon">👤</div>
+              <h3 className="use-case-title">Individuals</h3>
+              <p className="use-case-desc">Know what you pay for. Find receipts instantly. Keep purchases warranty-ready.</p>
+            </div>
+
+            <div className="use-case-card fade-up stagger-2">
+              <div className="use-case-icon">👨‍👩‍👧‍👦</div>
+              <h3 className="use-case-title">Families</h3>
+              <p className="use-case-desc">Shared subscriptions and shared proof of purchase—without chaos.</p>
+            </div>
+
+            <div className="use-case-card fade-up stagger-3">
+              <div className="use-case-icon">💼</div>
+              <h3 className="use-case-title">Busy professionals</h3>
+              <p className="use-case-desc">Claims and warranty documentation in minutes, not an evening of inbox searching.</p>
+            </div>
+          </div>
+
+          <p className="use-cases-closing fade-up">Less digging. More certainty.</p>
+        </div>
+      </section>
+
+      {/* Cyncro Intelligence */}
+      <section className="intelligence section-lg">
+        <div className="container">
+          <div className="intelligence-content">
+            <div className="intelligence-text">
+              <h2 className="section-title fade-up">Smart help—without the noise.</h2>
+              <p className="intelligence-subtitle fade-up stagger-1">Cyncro Intelligence turns your organized data into answers you can use. Ask, filter, export, and move on.</p>
+
+              <div className="prompt-chips fade-up stagger-2">
+                <div className="prompt-chip">
+                  <div className="prompt-chip-icon">
+                    <svg viewBox="0 0 24 24" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  </div>
+                  <span>"Show subscriptions I haven't used recently."</span>
+                </div>
+                <div className="prompt-chip">
+                  <div className="prompt-chip-icon">
+                    <svg viewBox="0 0 24 24" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  </div>
+                  <span>"Find my Apple purchase receipts."</span>
+                </div>
+                <div className="prompt-chip">
+                  <div className="prompt-chip-icon">
+                    <svg viewBox="0 0 24 24" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  </div>
+                  <span>"Export receipts for my travel claim."</span>
+                </div>
+                <div className="prompt-chip">
+                  <div className="prompt-chip-icon">
+                    <svg viewBox="0 0 24 24" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  </div>
+                  <span>"List purchases over $500 this year."</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="intelligence-preview fade-up stagger-3">
+              <div className="intel-panel-header">
+                <div className="intel-panel-dot"></div>
+                <span className="intel-panel-title">Cyncro Intelligence</span>
+              </div>
+              <div className="intel-panel-body">
+                <div className="intel-query">
+                  <div className="intel-query-avatar"></div>
+                  <div className="intel-query-text">Show subscriptions above $15/month</div>
+                </div>
+                <div className="intel-response">
+                  <p className="intel-response-text">Found 3 subscriptions above $15/month:</p>
+                  <div className="intel-result-list">
+                    <div className="intel-result-item">
+                      <span className="intel-result-name">Adobe Creative Cloud</span>
+                      <span className="intel-result-amount">$54.99</span>
+                    </div>
+                    <div className="intel-result-item">
+                      <span className="intel-result-name">Gym Membership</span>
+                      <span className="intel-result-amount">$29.00</span>
+                    </div>
+                    <div className="intel-result-item">
+                      <span className="intel-result-name">Netflix Premium</span>
+                      <span className="intel-result-amount">$22.99</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof */}
+      <section className="social-proof section">
+        <div className="container">
+          <div className="social-proof-badge fade-up">
+            <h3>Early access is limited.</h3>
+            <p>We're onboarding in small waves to keep quality high and feedback tight.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="pricing section-lg" id="pricing">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title fade-up">Choose the level of clarity you want.</h2>
+            <p className="section-subtitle fade-up stagger-1">Start free. Upgrade when you want automation, exports, and deeper organization.</p>
+          </div>
+
+          <div className="billing-toggle fade-up stagger-2">
+            <span className={`billing-option ${!billingAnnual ? 'active' : ''}`}>Monthly</span>
+            <button className={`billing-switch ${billingAnnual ? 'annual' : ''}`} aria-label="Toggle billing period" onClick={() => setBillingAnnual(!billingAnnual)}></button>
+            <span className={`billing-option ${billingAnnual ? 'active' : ''}`}>Annual<span className="billing-save">Save 20%</span></span>
+          </div>
+
+          <div className="pricing-grid">
+            {/* Signal - Free */}
+            <div className="pricing-card fade-up stagger-1">
+              <h3 className="pricing-name">Signal</h3>
+              <p className="pricing-tagline">Clean basics. Full control.</p>
+              <div className="pricing-price">
+                <span className="pricing-amount">Free</span>
+              </div>
+
+              <ul className="pricing-features">
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Manual subscription tracking</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Manual receipt uploads + basic tagging</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Basic search (merchant, date, amount)</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>High-value purchase library (limited)</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Single-device sync</span>
+                </li>
+              </ul>
+
+              <ul className="pricing-limits">
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <span>Limited receipt storage</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <span>No email extraction</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <span>No claims export</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <span>No Cyncro Intelligence</span>
+                </li>
+              </ul>
+
+              <Link href="/signup" className="btn btn-secondary pricing-cta">Get started free</Link>
+              <p className="pricing-micro">No card required.</p>
+            </div>
+
+            {/* Vault - Most chosen */}
+            <div className="pricing-card featured fade-up stagger-2">
+              <span className="pricing-popular">Most chosen</span>
+              <h3 className="pricing-name">Vault</h3>
+              <p className="pricing-tagline">Automation that keeps everything retrievable.</p>
+              <div className="pricing-price">
+                <span className="pricing-amount">{billingAnnual ? '$9' : '$11'}</span>
+                <span className="pricing-period">/ month</span>
+              </div>
+
+              <ul className="pricing-features">
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Everything in Signal, plus:</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Email receipt extraction</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Subscription detection</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Price-change + renewal alerts</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Unlimited high-value library</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Advanced search filters</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Multi-device sync</span>
+                </li>
+              </ul>
+
+              <Link href="/signup" className="btn btn-primary pricing-cta">Unlock Vault</Link>
+              <p className="pricing-micro">Try it. Cancel anytime.</p>
+            </div>
+
+            {/* Ledger */}
+            <div className="pricing-card fade-up stagger-3">
+              <h3 className="pricing-name">Ledger</h3>
+              <p className="pricing-tagline">Built for documentation, claims, and households.</p>
+              <div className="pricing-price">
+                <span className="pricing-amount">{billingAnnual ? '$17' : '$21'}</span>
+                <span className="pricing-period">/ month</span>
+              </div>
+
+              <ul className="pricing-features">
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Everything in Vault, plus:</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Claims Pack Export</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Family space (shared vault)</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Rules + folders (auto-organize)</span>
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Priority support</span>
+                </li>
+              </ul>
+
+              <Link href="/signup" className="btn btn-secondary pricing-cta">Get Ledger access</Link>
+              <p className="pricing-micro">Best for families and frequent purchases.</p>
+            </div>
+          </div>
+
+          <div className="pricing-faq fade-up">
+            <h4 className="pricing-faq-title">Quick answers</h4>
+            <div className="pricing-faq-grid">
+              <div className="pricing-faq-item">
+                <p className="pricing-faq-q">Can I switch plans?</p>
+                <p className="pricing-faq-a">Yes—upgrade or downgrade anytime.</p>
+              </div>
+              <div className="pricing-faq-item">
+                <p className="pricing-faq-q">Do I need to connect email/transactions?</p>
+                <p className="pricing-faq-a">No—manual mode works on every plan.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="faq section-lg" id="faq">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title fade-up">Frequently asked questions</h2>
+          </div>
+
+          <div className="accordion fade-up">
+            {faqItems.map((item, index) => (
+              <div key={index} className={`accordion-item ${activeFaqAccordion === index ? 'active' : ''}`}>
+                <button className="accordion-header" onClick={() => setActiveFaqAccordion(activeFaqAccordion === index ? null : index)}>
+                  <span>{item.question}</span>
+                  <svg className="accordion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <div className="accordion-content">
+                  <div className="accordion-body">{item.answer}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="final-cta section-lg" id="signup">
+        <div className="container">
+          <h2 className="final-cta-headline fade-up">Stop paying blindly. Stop searching endlessly.</h2>
+          <p className="final-cta-sub fade-up stagger-1">Cyncro keeps subscriptions visible and receipts retrievable—so you're ready for warranties, claims, and real-life surprises.</p>
+
+          {!formSubmitted ? (
+            <div className="waitlist-form fade-up stagger-2" id="waitlistForm">
+              <form onSubmit={handleFormSubmit}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="email">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    className="form-input"
+                    placeholder="you@domain.com"
+                    required
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setEmailError(false) }}
+                  />
+                  {emailError && <p className="form-error">Please enter a valid email address.</p>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="goal">Primary goal</label>
+                  <select
+                    id="goal"
+                    className="form-select"
+                    required
+                    value={goal}
+                    onChange={(e) => setGoal(e.target.value)}
+                  >
+                    <option value="" disabled>Select your main use case</option>
+                    <option value="subscriptions">Track subscriptions</option>
+                    <option value="receipts">Save receipts automatically</option>
+                    <option value="claims">Claims &amp; warranties</option>
+                    <option value="family">Family organization</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-checkbox">
+                    <input
+                      type="checkbox"
+                      id="updates"
+                      checked={updates}
+                      onChange={(e) => setUpdates(e.target.checked)}
+                    />
+                    <span className="form-checkbox-label">Send me product updates (rare and useful).</span>
+                  </label>
+                </div>
+
+                <button type="submit" className="btn btn-primary btn-lg form-submit">Request early access</button>
+              </form>
+              <p className="form-micro">Takes 30 seconds. No spam.</p>
+            </div>
+          ) : (
+            <div className="waitlist-form fade-up stagger-2">
+              <div className="form-success">
+                <div className="form-success-icon">
+                  <svg viewBox="0 0 24 24" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h3 className="form-success-title">You're on the list.</h3>
+                <p className="form-success-text">We'll reach out when your access is ready.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="container footer-inner">
+          <div className="footer-links">
+            <Link href="/privacy" className="footer-link">Privacy</Link>
+            <Link href="/terms" className="footer-link">Terms</Link>
+            <a href="#security" className="footer-link" onClick={(e) => scrollToSection(e, '#security')}>Security</a>
+            <Link href="/contact" className="footer-link">Contact</Link>
+          </div>
+          <p className="footer-copy">© 2026 Cyncro. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
   )
 }

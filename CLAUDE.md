@@ -229,6 +229,17 @@ Required in `.env.local`:
     - Database migration: `/supabase/migrations/004_cancel_guides.sql` for caching
     - Updated Cancel Kit modal with verification metadata display
     - Updated Add Subscription modal with auto-fill Cancel URL (with loading spinner and "AI-suggested" badge)
+17. **Subscription Showcase Section** (Jan 5, 2026) - Landing page enhancement
+    - **Animated floating icons** - 27 subscription service logos flowing horizontally in continuous marquee animation
+    - **Two-row layout** - Top row moves right, bottom row moves left, creating dynamic effect
+    - **Real brand logos** - All SVG paths sourced from Simple Icons (Netflix, Spotify, YouTube, Disney+, Adobe, Figma, OpenAI, etc.)
+    - **Brand colors** - Each icon has its official brand color for recognition
+    - **Central content** - "Take control of every subscription" headline with feature pills and CTA
+    - **Feature pills**: Monthly spend tracking, "Charges tomorrow" alerts, AI cancel kits, Price change detection
+    - **Dark theme section** - Matches premium landing page aesthetic with gradient orbs and grid pattern
+    - **Accessibility** - Respects `prefers-reduced-motion` media query
+    - New component: `/components/marketing/SubscriptionMarquee.tsx` with `SubscriptionFloat` export
+    - Services included: Netflix, Spotify, YouTube, Disney+, HBO Max, Apple TV+, Prime Video, Hulu, Paramount+, Peacock, Adobe, Figma, Notion, Microsoft, Google, Dropbox, Slack, Zoom, Canva, Linear, OpenAI, GitHub, Anthropic, Duolingo, Headspace, Strava, Grammarly
 
 ### Known Issues / TODO:
 - Email forwarding via Resend is less reliable than Gmail API (forwarded emails lose original sender info)
