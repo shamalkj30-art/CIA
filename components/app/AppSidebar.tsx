@@ -460,7 +460,7 @@ export function AppSidebar() {
                     key={item.href}
                     {...item}
                     collapsed={collapsed}
-                    notificationCount={item.notificationKey ? notificationCounts?.[item.notificationKey as keyof typeof notificationCounts] : undefined}
+                    notificationCount={'notificationKey' in item && item.notificationKey ? notificationCounts?.[item.notificationKey as keyof typeof notificationCounts] : undefined}
                   />
                 ))}
               </div>
@@ -565,7 +565,7 @@ export function AppSidebar() {
                         key={item.href}
                         {...item}
                         collapsed={false}
-                        notificationCount={item.notificationKey ? notificationCounts?.[item.notificationKey as keyof typeof notificationCounts] : undefined}
+                        notificationCount={'notificationKey' in item && item.notificationKey ? notificationCounts?.[item.notificationKey as keyof typeof notificationCounts] : undefined}
                       />
                     ))}
                   </div>
