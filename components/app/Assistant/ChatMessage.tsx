@@ -89,65 +89,42 @@ export function ChatMessage({ message }: ChatMessageProps) {
 }
 
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCallRecord }) {
-  const [expanded, setExpanded] = useState(false)
-
   const toolLabels: Record<string, string> = {
-    list_purchases: 'Listed purchases',
+    list_purchases: 'Fetched your purchases',
     get_purchase: 'Got purchase details',
-    create_purchase: 'Created purchase',
+    create_purchase: 'Created new purchase',
     update_purchase: 'Updated purchase',
     delete_purchase: 'Deleted purchase',
-    list_subscriptions: 'Listed subscriptions',
-    create_subscription: 'Created subscription',
-    generate_cancel_kit: 'Generated cancel guide',
-    list_cases: 'Listed cases',
-    create_case: 'Created case',
+    list_subscriptions: 'Fetched your subscriptions',
+    create_subscription: 'Created new subscription',
+    generate_cancel_kit: 'Generated cancellation guide',
+    list_cases: 'Fetched your cases',
+    create_case: 'Created new case',
     generate_case_message: 'Generated message',
-    list_vault_items: 'Listed vault items',
-    get_spending_analytics: 'Got spending analytics',
+    list_vault_items: 'Fetched vault items',
+    get_spending_analytics: 'Analyzed your spending',
   }
 
   return (
-    <div className="bg-black/10 rounded-lg px-2.5 py-1.5 text-xs">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full"
-      >
-        <span className="flex items-center gap-1.5">
-          {toolCall.success ? (
-            <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          ) : (
-            <svg className="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          )}
-          {toolLabels[toolCall.tool_name] || toolCall.tool_name}
-        </span>
-        <svg
-          className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    <div className="flex items-center gap-1.5 text-xs opacity-70">
+      {toolCall.success ? (
+        <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clipRule="evenodd"
+          />
         </svg>
-      </button>
-
-      {expanded && (
-        <pre className="mt-2 p-2 bg-black/20 rounded text-[10px] overflow-x-auto max-h-32 overflow-y-auto">
-          {JSON.stringify(toolCall.output, null, 2)}
-        </pre>
+      ) : (
+        <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
       )}
+      <span>{toolLabels[toolCall.tool_name] || toolCall.tool_name}</span>
     </div>
   )
 }
