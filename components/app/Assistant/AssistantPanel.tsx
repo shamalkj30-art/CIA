@@ -35,15 +35,48 @@ export function AssistantPanel() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, setIsOpen])
 
-  if (!isOpen) return null
-
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
-        onClick={() => setIsOpen(false)}
-      />
+      {/* Floating Assistant Button - Always visible when panel is closed */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="
+            fixed top-4 right-4 z-40
+            flex items-center gap-2 px-4 py-2.5
+            bg-gradient-to-r from-violet-500 to-purple-600
+            hover:from-violet-600 hover:to-purple-700
+            text-white font-medium text-sm
+            rounded-full shadow-lg hover:shadow-xl
+            transition-all duration-200
+            hover:scale-105 active:scale-95
+          "
+          title="Open AI Assistant (Cmd+/)"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            />
+          </svg>
+          <span className="hidden sm:inline">AI Assistant</span>
+        </button>
+      )}
+
+      {/* Backdrop - only show when panel is open */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
 
       {/* Panel */}
       <div
@@ -53,7 +86,7 @@ export function AssistantPanel() {
           bg-[var(--card)] border-l border-[var(--border)]
           shadow-2xl
           transform transition-transform duration-300 ease-out
-          ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+          ${isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'}
           flex flex-col
         `}
       >
