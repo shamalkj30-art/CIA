@@ -1,668 +1,959 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Card, Badge } from '@/components/ui'
-import { QuickAddMenu } from '@/components/app'
-import type { PurchaseWithDocuments, Subscription } from '@/lib/types'
+import { z } from 'zod'
+import {
+  DataTable,
+  StatusBadge,
+  SelectionCheckbox,
+  ChartContainer,
+  LineChart,
+  BarChart,
+  ChartPeriodSelector,
+  CreateEditModal,
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+} from '@/components/dashboard'
+import { useToast } from '@/components/providers/ToastProvider'
+import { ColumnDef } from '@tanstack/react-table'
 
-interface DashboardStats {
-  totalItems: number
-  activeWarranties: number
-  expiringSoon: number
-  expired: number
-  totalValue: string
-  needsReview: number
+// Types
+interface Purchase {
+  id: string
+  item_name: string
+  merchant: string
+  price: number
+  purchase_date: string
+  warranty_expires_at: string | null
+  return_deadline: string | null
+  status: string
+  needs_review: boolean
+  created_at: string
+  category?: string
 }
 
-interface WeeklyDigest {
-  newPurchases: number
-  warrantiesExpired: number
-  upcomingDeadlines: number
-  subscriptionCharges: number
-  totalSpentThisWeek: number
-}
-
-interface UpcomingCharge {
+interface Subscription {
   id: string
   merchant: string
   price: number
-  chargeDate: string
-  daysUntil: number
+  status: string
+  billing_cycle: string
+  next_charge_date: string | null
 }
 
-export default function DashboardPage() {
-  const [purchases, setPurchases] = useState<PurchaseWithDocuments[]>([])
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<DashboardStats>({
-    totalItems: 0,
-    activeWarranties: 0,
-    expiringSoon: 0,
-    expired: 0,
-    totalValue: '$0',
-    needsReview: 0,
+// Schema for creating new purchase
+const purchaseSchema = z.object({
+  item_name: z.string().min(1, 'Item name is required'),
+  merchant: z.string().min(1, 'Merchant is required'),
+  price: z.coerce.number().min(0, 'Price must be positive'),
+  purchase_date: z.string().min(1, 'Purchase date is required'),
+  warranty_expires_at: z.string().optional(),
+})
+
+type PurchaseFormData = z.infer<typeof purchaseSchema>
+
+// API Functions
+async function fetchPurchases(): Promise<Purchase[]> {
+  const res = await fetch('/api/purchases')
+  if (!res.ok) throw new Error('Failed to fetch purchases')
+  return res.json()
+}
+
+async function fetchSubscriptions(): Promise<Subscription[]> {
+  const res = await fetch('/api/subscriptions')
+  if (!res.ok) return []
+  return res.json()
+}
+
+async function createPurchase(data: PurchaseFormData): Promise<Purchase> {
+  const res = await fetch('/api/purchases', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
   })
-  const [weeklyDigest, setWeeklyDigest] = useState<WeeklyDigest>({
-    newPurchases: 0,
-    warrantiesExpired: 0,
-    upcomingDeadlines: 0,
-    subscriptionCharges: 0,
-    totalSpentThisWeek: 0,
-  })
-  const [upcomingCharges, setUpcomingCharges] = useState<UpcomingCharge[]>([])
+  if (!res.ok) throw new Error('Failed to create purchase')
+  return res.json()
+}
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch purchases and subscriptions in parallel
-        const [purchasesRes, subscriptionsRes] = await Promise.all([
-          fetch('/api/purchases'),
-          fetch('/api/subscriptions'),
-        ])
-
-        const purchasesData: PurchaseWithDocuments[] = purchasesRes.ok ? await purchasesRes.json() : []
-        const subscriptionsData: Subscription[] = subscriptionsRes.ok ? await subscriptionsRes.json() : []
-
-        setPurchases(purchasesData)
-        setSubscriptions(subscriptionsData)
-
-        // Calculate stats
-        const now = new Date()
-        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        let activeCount = 0
-        let expiringSoonCount = 0
-        let expiredCount = 0
-        let totalPriceValue = 0
-        let needsReviewCount = 0
-
-        // Weekly digest counters
-        let newPurchasesThisWeek = 0
-        let warrantiesExpiredThisWeek = 0
-        let upcomingDeadlinesCount = 0
-        let totalSpentThisWeek = 0
-
-        purchasesData.forEach((p) => {
-          if (p.price) totalPriceValue += p.price
-          if (p.needs_review) needsReviewCount++
-
-          // Check if added this week
-          if (new Date(p.created_at) >= oneWeekAgo) {
-            newPurchasesThisWeek++
-            if (p.price) totalSpentThisWeek += p.price
-          }
-
-          if (p.warranty_expires_at) {
-            const expiresAt = new Date(p.warranty_expires_at)
-            const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-            if (daysLeft < 0) {
-              expiredCount++
-              // Check if expired this week
-              if (expiresAt >= oneWeekAgo) {
-                warrantiesExpiredThisWeek++
-              }
-            } else if (daysLeft <= 30) {
-              expiringSoonCount++
-              activeCount++
-              upcomingDeadlinesCount++
-            } else {
-              activeCount++
-            }
-          }
-
-          // Return deadlines count
-          if ((p as any).return_deadline) {
-            const returnDate = new Date((p as any).return_deadline)
-            if (returnDate > now && returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)) {
-              upcomingDeadlinesCount++
-            }
-          }
-        })
-
-        // Calculate subscription charges this week
-        let subscriptionChargesThisWeek = 0
-        const upcomingChargesList: UpcomingCharge[] = []
-
-        subscriptionsData
-          .filter(s => s.status === 'active' && s.next_charge_date)
-          .forEach(s => {
-            const chargeDate = new Date(s.next_charge_date!)
-            const daysUntil = Math.ceil((chargeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-            if (daysUntil >= 0 && daysUntil <= 14) {
-              upcomingChargesList.push({
-                id: s.id,
-                merchant: s.merchant,
-                price: s.price,
-                chargeDate: s.next_charge_date!,
-                daysUntil,
-              })
-            }
-
-            if (daysUntil >= 0 && daysUntil <= 7) {
-              subscriptionChargesThisWeek++
-            }
-          })
-
-        // Sort by days until charge
-        upcomingChargesList.sort((a, b) => a.daysUntil - b.daysUntil)
-        setUpcomingCharges(upcomingChargesList.slice(0, 6))
-
-        setStats({
-          totalItems: purchasesData.length,
-          activeWarranties: activeCount,
-          expiringSoon: expiringSoonCount,
-          expired: expiredCount,
-          totalValue: '$' + totalPriceValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-          needsReview: needsReviewCount,
-        })
-
-        setWeeklyDigest({
-          newPurchases: newPurchasesThisWeek,
-          warrantiesExpired: warrantiesExpiredThisWeek,
-          upcomingDeadlines: upcomingDeadlinesCount,
-          subscriptionCharges: subscriptionChargesThisWeek,
-          totalSpentThisWeek,
-        })
-      } catch (error) {
-        console.error('Failed to fetch data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [])
-
-  const getWarrantyInfo = (expiresAt: string | null) => {
-    if (!expiresAt) return { daysLeft: -1, status: 'none' as const }
-    const expires = new Date(expiresAt)
-    const now = new Date()
-    const daysLeft = Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-    if (daysLeft < 0) return { daysLeft, status: 'expired' as const }
-    if (daysLeft <= 30) return { daysLeft, status: 'warning' as const }
-    return { daysLeft, status: 'active' as const }
-  }
-
-  // Items needing attention - now categorized
-  const attentionItems = purchases
-    .filter(p => {
-      const info = getWarrantyInfo(p.warranty_expires_at)
-      const hasReturnDeadline = (p as any).return_deadline && new Date((p as any).return_deadline) > new Date()
-      return info.status === 'warning' || hasReturnDeadline || p.needs_review
-    })
-    .map(p => {
-      const info = getWarrantyInfo(p.warranty_expires_at)
-      const hasReturnDeadline = (p as any).return_deadline && new Date((p as any).return_deadline) > new Date()
-      let category: 'return' | 'warranty' | 'review' = 'warranty'
-      let urgency = info.daysLeft
-
-      if (hasReturnDeadline) {
-        category = 'return'
-        urgency = Math.ceil((new Date((p as any).return_deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      } else if (p.needs_review) {
-        category = 'review'
-        urgency = 999 // Low priority
-      }
-
-      return { ...p, category, urgency }
-    })
-    .sort((a, b) => a.urgency - b.urgency)
-    .slice(0, 5)
-
-  // Recent purchases
-  const recentPurchases = [...purchases]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5)
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
-  const formatRelativeDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-    if (diffDays === 0) return 'Today'
-    if (diffDays === 1) return 'Yesterday'
-    if (diffDays < 7) return `${diffDays} days ago`
-    return formatDate(dateStr)
-  }
-
-  const getChargeLabel = (daysUntil: number) => {
-    if (daysUntil === 0) return 'Today'
-    if (daysUntil === 1) return 'Tomorrow'
-    return `In ${daysUntil} days`
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 border-2 border-[var(--border)] border-t-[var(--primary)] rounded-full animate-spin" />
-          <p className="text-[var(--text-muted)]">Loading dashboard...</p>
-        </div>
-      </div>
+async function deletePurchases(ids: string[]): Promise<void> {
+  await Promise.all(
+    ids.map(id =>
+      fetch(`/api/purchases/${id}`, { method: 'DELETE' })
     )
+  )
+}
+
+// Generate chart data
+function generateChartData(days: number) {
+  const data = []
+  const now = new Date()
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(now)
+    date.setDate(date.getDate() - i)
+    data.push({
+      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      purchases: Math.floor(Math.random() * 5) + 1,
+      value: Math.floor(Math.random() * 500) + 100,
+    })
+  }
+  return data
+}
+
+function generateCategoryData() {
+  return [
+    { category: 'Electronics', count: 12, value: 2400 },
+    { category: 'Appliances', count: 8, value: 1800 },
+    { category: 'Furniture', count: 5, value: 1200 },
+    { category: 'Clothing', count: 15, value: 600 },
+    { category: 'Other', count: 10, value: 800 },
+  ]
+}
+
+// Dashboard tabs
+const tabs = [
+  { id: 'activity', label: 'Activity' },
+  { id: 'purchases', label: 'Purchases' },
+  { id: 'subscriptions', label: 'Subscriptions' },
+  { id: 'warranties', label: 'Warranties' },
+  { id: 'returns', label: 'Returns' },
+]
+
+// History filter tabs
+const historyFilters = [
+  { id: 'all', label: 'All History' },
+  { id: 'purchase', label: 'Purchase' },
+  { id: 'warranty', label: 'Warranty' },
+  { id: 'return', label: 'Return' },
+  { id: 'subscription', label: 'Subscription' },
+]
+
+// Skeleton components
+function CardSkeleton() {
+  return (
+    <div className="bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-2xl overflow-hidden animate-pulse">
+      <div className="aspect-[4/3] bg-[var(--surface-subtle)]" />
+      <div className="p-4 space-y-2">
+        <div className="h-4 bg-[var(--surface-subtle)] rounded w-3/4" />
+        <div className="h-3 bg-[var(--surface-subtle)] rounded w-1/2" />
+      </div>
+    </div>
+  )
+}
+
+function TableSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="h-14 bg-[var(--surface-subtle)] rounded-xl" />
+      ))}
+    </div>
+  )
+}
+
+function PageSkeleton() {
+  return (
+    <div className="space-y-8 animate-fade-in">
+      {/* Header skeleton */}
+      <div className="space-y-2">
+        <div className="h-8 bg-[var(--surface-subtle)] rounded-lg w-48" />
+        <div className="h-4 bg-[var(--surface-subtle)] rounded w-64" />
+      </div>
+
+      {/* Tabs skeleton */}
+      <div className="flex gap-2">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-9 w-24 bg-[var(--surface-subtle)] rounded-lg" />
+        ))}
+      </div>
+
+      {/* Cards skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => <CardSkeleton key={i} />)}
+      </div>
+
+      {/* Table skeleton */}
+      <div className="bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-2xl p-6">
+        <TableSkeleton />
+      </div>
+    </div>
+  )
+}
+
+// Activity Card component (like Live Auctions)
+function ActivityCard({ purchase, type }: { purchase: Purchase; type: 'warranty' | 'return' | 'new' }) {
+  const now = new Date()
+  let deadline: Date | null = null
+  let daysLeft = 0
+  let statusColor = 'bg-[var(--primary)]'
+  let statusText = 'Active'
+
+  if (type === 'warranty' && purchase.warranty_expires_at) {
+    deadline = new Date(purchase.warranty_expires_at)
+    daysLeft = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    if (daysLeft <= 7) {
+      statusColor = 'bg-[var(--danger)]'
+      statusText = 'Ending Soon'
+    } else if (daysLeft <= 30) {
+      statusColor = 'bg-[var(--warning)]'
+      statusText = 'Expiring'
+    }
+  } else if (type === 'return' && purchase.return_deadline) {
+    deadline = new Date(purchase.return_deadline)
+    daysLeft = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    if (daysLeft <= 3) {
+      statusColor = 'bg-[var(--danger)]'
+      statusText = 'Ending Soon'
+    } else if (daysLeft <= 7) {
+      statusColor = 'bg-[var(--warning)]'
+      statusText = 'Limited Time'
+    }
+  } else if (type === 'new') {
+    statusColor = 'bg-[var(--success)]'
+    statusText = 'New'
+  }
+
+  // Get category icon
+  const getCategoryIcon = (category?: string) => {
+    switch (category?.toLowerCase()) {
+      case 'electronics':
+        return '💻'
+      case 'appliances':
+        return '🔌'
+      case 'furniture':
+        return '🪑'
+      case 'clothing':
+        return '👕'
+      default:
+        return '📦'
+    }
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)]">Dashboard</h1>
-          <p className="text-[var(--text-secondary)] mt-1">Your warranty command center</p>
+    <Link
+      href={`/purchases/${purchase.id}`}
+      className="group bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-2xl overflow-hidden hover:border-[var(--primary)]/50 hover:shadow-xl hover:shadow-[var(--primary)]/5 transition-all duration-300"
+    >
+      {/* Image/Icon area */}
+      <div className="relative aspect-[4/3] bg-gradient-to-br from-[var(--surface-subtle)] to-[var(--surface)] flex items-center justify-center">
+        <span className="text-5xl opacity-80 group-hover:scale-110 transition-transform duration-300">
+          {getCategoryIcon(purchase.category)}
+        </span>
+
+        {/* Status badge */}
+        <div className={`absolute top-3 left-3 px-2.5 py-1 ${statusColor} text-white text-xs font-semibold rounded-lg flex items-center gap-1.5`}>
+          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+          {statusText}
         </div>
-        <QuickAddMenu />
+
+        {/* Countdown */}
+        {deadline && daysLeft > 0 && (
+          <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-sm text-white text-xs font-mono rounded-lg">
+            {daysLeft}d left
+          </div>
+        )}
       </div>
 
-      {/* Weekly Digest Banner */}
-      <Card padding="lg" className="bg-gradient-to-r from-[var(--primary)]/5 via-[var(--primary)]/10 to-[var(--primary)]/5 border-[var(--primary)]/20">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-[var(--primary)] flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+      {/* Content */}
+      <div className="p-4">
+        <h3 className="font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--primary)] transition-colors">
+          {purchase.item_name}
+        </h3>
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-sm text-[var(--text-muted)]">{purchase.merchant}</span>
+          <span className="font-semibold text-[var(--text-primary)]">
+            ${purchase.price?.toLocaleString() || '0'}
+          </span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// Subscription Card component
+function SubscriptionCard({ subscription }: { subscription: Subscription }) {
+  const chargeDate = subscription.next_charge_date ? new Date(subscription.next_charge_date) : null
+  const daysUntil = chargeDate
+    ? Math.ceil((chargeDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null
+
+  let urgencyColor = 'text-[var(--text-muted)]'
+  if (daysUntil !== null) {
+    if (daysUntil <= 1) urgencyColor = 'text-[var(--danger)]'
+    else if (daysUntil <= 3) urgencyColor = 'text-[var(--warning)]'
+  }
+
+  // Service colors
+  const serviceColors: Record<string, string> = {
+    'netflix': 'from-red-500 to-red-600',
+    'spotify': 'from-green-500 to-green-600',
+    'youtube': 'from-red-500 to-red-700',
+    'disney': 'from-blue-500 to-blue-700',
+    'apple': 'from-gray-500 to-gray-700',
+    'amazon': 'from-orange-500 to-orange-600',
+  }
+
+  const serviceName = subscription.merchant.toLowerCase()
+  const gradient = Object.entries(serviceColors).find(([key]) => serviceName.includes(key))?.[1] || 'from-[var(--primary)] to-purple-500'
+
+  return (
+    <Link
+      href={`/subscriptions/${subscription.id}`}
+      className="group bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-2xl overflow-hidden hover:border-[var(--primary)]/50 hover:shadow-xl hover:shadow-[var(--primary)]/5 transition-all duration-300"
+    >
+      <div className="relative aspect-[4/3] bg-gradient-to-br from-[var(--surface-subtle)] to-[var(--surface)] flex items-center justify-center">
+        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+          <span className="text-white font-bold text-2xl">{subscription.merchant.charAt(0).toUpperCase()}</span>
+        </div>
+
+        {/* Charge badge */}
+        {daysUntil !== null && daysUntil <= 7 && (
+          <div className={`absolute top-3 left-3 px-2.5 py-1 ${daysUntil <= 1 ? 'bg-[var(--danger)]' : 'bg-[var(--warning)]'} text-white text-xs font-semibold rounded-lg`}>
+            {daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `In ${daysUntil}d`}
+          </div>
+        )}
+      </div>
+
+      <div className="p-4">
+        <h3 className="font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--primary)] transition-colors">
+          {subscription.merchant}
+        </h3>
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-sm text-[var(--text-muted)] capitalize">{subscription.billing_cycle}</span>
+          <span className="font-semibold text-[var(--text-primary)]">
+            ${subscription.price?.toFixed(2)}
+          </span>
+        </div>
+        {chargeDate && (
+          <p className={`text-xs mt-2 ${urgencyColor}`}>
+            Charges {daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : chargeDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </p>
+        )}
+      </div>
+    </Link>
+  )
+}
+
+export default function DashboardPage() {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+
+  const [activeTab, setActiveTab] = useState('activity')
+  const [historyFilter, setHistoryFilter] = useState('all')
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [selectedForDelete, setSelectedForDelete] = useState<Purchase[]>([])
+  const [chartPeriod, setChartPeriod] = useState('30d')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
+  // Queries
+  const {
+    data: purchases = [],
+    isLoading: purchasesLoading,
+    error: purchasesError,
+    refetch: refetchPurchases,
+  } = useQuery({
+    queryKey: ['purchases'],
+    queryFn: fetchPurchases,
+  })
+
+  const {
+    data: subscriptions = [],
+    isLoading: subscriptionsLoading,
+  } = useQuery({
+    queryKey: ['subscriptions'],
+    queryFn: fetchSubscriptions,
+  })
+
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: createPurchase,
+    onMutate: async (newPurchase) => {
+      await queryClient.cancelQueries({ queryKey: ['purchases'] })
+      const previousPurchases = queryClient.getQueryData(['purchases'])
+
+      queryClient.setQueryData(['purchases'], (old: Purchase[] = []) => [
+        {
+          id: 'temp-' + Date.now(),
+          ...newPurchase,
+          status: 'active',
+          needs_review: false,
+          created_at: new Date().toISOString(),
+        },
+        ...old,
+      ])
+
+      return { previousPurchases }
+    },
+    onError: (err, newPurchase, context) => {
+      queryClient.setQueryData(['purchases'], context?.previousPurchases)
+      toast.error('Failed to create purchase', err.message)
+    },
+    onSuccess: () => {
+      toast.success('Purchase created', 'Your new purchase has been added.')
+      setCreateModalOpen(false)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deletePurchases,
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ['purchases'] })
+      const previousPurchases = queryClient.getQueryData(['purchases'])
+
+      queryClient.setQueryData(['purchases'], (old: Purchase[] = []) =>
+        old.filter(p => !ids.includes(p.id))
+      )
+
+      return { previousPurchases }
+    },
+    onError: (err, ids, context) => {
+      queryClient.setQueryData(['purchases'], context?.previousPurchases)
+      toast.error('Failed to delete', 'Could not delete the selected items.')
+    },
+    onSuccess: (_, ids) => {
+      toast.success('Deleted', `${ids.length} item(s) have been removed.`)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      setSelectedForDelete([])
+    },
+  })
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const now = new Date()
+    let activeWarranties = 0
+    let expiringSoon = 0
+    let totalValue = 0
+    let needsReview = 0
+    const recentPurchases: Purchase[] = []
+    const expiringItems: Purchase[] = []
+    const returnDeadlines: Purchase[] = []
+
+    purchases.forEach((p) => {
+      if (p.price) totalValue += p.price
+      if (p.needs_review) needsReview++
+
+      // Recent (last 7 days)
+      const createdAt = new Date(p.created_at)
+      const daysSinceCreated = Math.ceil((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+      if (daysSinceCreated <= 7) recentPurchases.push(p)
+
+      // Warranties
+      if (p.warranty_expires_at) {
+        const expiresAt = new Date(p.warranty_expires_at)
+        const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+        if (daysLeft > 0) {
+          activeWarranties++
+          if (daysLeft <= 30) {
+            expiringSoon++
+            expiringItems.push(p)
+          }
+        }
+      }
+
+      // Return deadlines
+      if (p.return_deadline) {
+        const deadline = new Date(p.return_deadline)
+        const daysLeft = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysLeft > 0 && daysLeft <= 14) {
+          returnDeadlines.push(p)
+        }
+      }
+    })
+
+    return {
+      totalItems: purchases.length,
+      activeWarranties,
+      expiringSoon,
+      totalValue,
+      needsReview,
+      recentPurchases,
+      expiringItems,
+      returnDeadlines,
+    }
+  }, [purchases])
+
+  // Chart data
+  const chartData = useMemo(() => {
+    const days = chartPeriod === '7d' ? 7 : chartPeriod === '30d' ? 30 : chartPeriod === '90d' ? 90 : 365
+    return generateChartData(days)
+  }, [chartPeriod])
+
+  const categoryData = useMemo(() => generateCategoryData(), [])
+
+  // Filtered history data
+  const historyData = useMemo(() => {
+    let filtered = [...purchases]
+    if (historyFilter === 'warranty') {
+      filtered = purchases.filter(p => p.warranty_expires_at)
+    } else if (historyFilter === 'return') {
+      filtered = purchases.filter(p => p.return_deadline)
+    } else if (historyFilter === 'purchase') {
+      filtered = purchases.slice(0, 20)
+    }
+    return filtered.slice(0, 10)
+  }, [purchases, historyFilter])
+
+  // Table columns
+  const columns = useMemo<ColumnDef<Purchase>[]>(() => [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <SelectionCheckbox
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          indeterminate={table.getIsSomePageRowsSelected()}
+        />
+      ),
+      cell: ({ row }) => (
+        <SelectionCheckbox
+          checked={row.getIsSelected()}
+          onChange={(value) => row.toggleSelected(!!value)}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'type',
+      header: 'Event',
+      cell: ({ row }) => {
+        const hasWarranty = row.original.warranty_expires_at
+        const hasReturn = row.original.return_deadline
+        return (
+          <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+            hasReturn ? 'bg-[var(--warning)]/10 text-[var(--warning)]' :
+            hasWarranty ? 'bg-[var(--primary)]/10 text-[var(--primary)]' :
+            'bg-[var(--success)]/10 text-[var(--success)]'
+          }`}>
+            {hasReturn ? 'Return' : hasWarranty ? 'Warranty' : 'Purchase'}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'item_name',
+      header: 'Item',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[var(--surface-subtle)] flex items-center justify-center text-lg">
+            {row.original.category === 'electronics' ? '💻' :
+             row.original.category === 'appliances' ? '🔌' :
+             row.original.category === 'furniture' ? '🪑' : '📦'}
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Weekly Digest</h2>
-            <p className="text-sm text-[var(--text-muted)]">Your activity this week</p>
+            <Link
+              href={`/purchases/${row.original.id}`}
+              className="font-medium text-[var(--text-primary)] hover:text-[var(--primary)] transition-colors"
+            >
+              {row.original.item_name}
+            </Link>
+            <p className="text-xs text-[var(--text-muted)]">{row.original.merchant}</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-3 bg-[var(--card)] rounded-xl">
-            <div className="text-2xl font-bold text-[var(--primary)]">{weeklyDigest.newPurchases}</div>
-            <p className="text-xs text-[var(--text-muted)]">New purchases</p>
-          </div>
-          <div className="p-3 bg-[var(--card)] rounded-xl">
-            <div className="text-2xl font-bold text-[var(--warning)]">{weeklyDigest.upcomingDeadlines}</div>
-            <p className="text-xs text-[var(--text-muted)]">Upcoming deadlines</p>
-          </div>
-          <div className="p-3 bg-[var(--card)] rounded-xl">
-            <div className="text-2xl font-bold text-blue-500">{weeklyDigest.subscriptionCharges}</div>
-            <p className="text-xs text-[var(--text-muted)]">Charges this week</p>
-          </div>
-          <div className="p-3 bg-[var(--card)] rounded-xl">
-            <div className="text-2xl font-bold text-[var(--text-primary)]">
-              ${weeklyDigest.totalSpentThisWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </div>
-            <p className="text-xs text-[var(--text-muted)]">Tracked this week</p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Stats Grid - Bento style */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card padding="md" className="group hover:border-[var(--primary)]/30 transition-colors">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-          </div>
-          <div className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalItems}</div>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">Total items</p>
-        </Card>
-
-        <Card padding="md" className="group hover:border-[var(--success)]/30 transition-colors">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--success)]/10 flex items-center justify-center text-[var(--success)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-          </div>
-          <div className="text-3xl font-bold text-[var(--success)]">{stats.activeWarranties}</div>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">Protected</p>
-        </Card>
-
-        <Card padding="md" className="group hover:border-[var(--warning)]/30 transition-colors">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--warning-soft)] flex items-center justify-center text-[var(--warning)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            {stats.expiringSoon > 0 && (
-              <Badge variant="warning" size="sm">{stats.expiringSoon}</Badge>
-            )}
-          </div>
-          <div className="text-3xl font-bold text-[var(--warning)]">{stats.expiringSoon}</div>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">Expiring soon</p>
-        </Card>
-
-        <Link href="/inbox?tab=inbox">
-          <Card padding="md" className="group hover:border-blue-500/30 transition-colors cursor-pointer h-full">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-              </div>
-              {stats.needsReview > 0 && (
-                <Badge variant="info" size="sm">{stats.needsReview}</Badge>
-              )}
-            </div>
-            <div className="text-3xl font-bold text-blue-500">{stats.needsReview}</div>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">Needs review</p>
-          </Card>
+      ),
+    },
+    {
+      accessorKey: 'price',
+      header: 'Value',
+      cell: ({ row }) => (
+        <span className="font-semibold text-[var(--text-primary)]">
+          ${row.original.price?.toLocaleString() || '—'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'purchase_date',
+      header: 'Date',
+      cell: ({ row }) => (
+        <span className="text-[var(--text-secondary)]">
+          {row.original.purchase_date
+            ? new Date(row.original.purchase_date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'link',
+      header: 'Link',
+      cell: ({ row }) => (
+        <Link
+          href={`/purchases/${row.original.id}`}
+          className="text-[var(--primary)] hover:underline text-sm truncate max-w-[200px] block"
+        >
+          View details →
         </Link>
+      ),
+    },
+  ], [])
 
-        <Card padding="md" className="group hover:border-[var(--primary)]/30 transition-colors">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  // Handle bulk delete
+  const handleBulkDelete = (rows: Purchase[]) => {
+    setSelectedForDelete(rows)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = () => {
+    const ids = selectedForDelete.map(p => p.id)
+    deleteMutation.mutate(ids)
+    setDeleteDialogOpen(false)
+  }
+
+  const isLoading = purchasesLoading || subscriptionsLoading
+
+  if (isLoading) {
+    return <PageSkeleton />
+  }
+
+  if (purchasesError) {
+    return (
+      <ErrorState
+        message="Unable to load dashboard data. Please try again."
+        retry={() => refetchPurchases()}
+      />
+    )
+  }
+
+  // Get items for current tab
+  const getActivityItems = () => {
+    switch (activeTab) {
+      case 'warranties':
+        return stats.expiringItems
+      case 'returns':
+        return stats.returnDeadlines
+      case 'purchases':
+        return purchases.slice(0, 8)
+      default:
+        return [
+          ...stats.returnDeadlines.slice(0, 2),
+          ...stats.expiringItems.slice(0, 2),
+          ...stats.recentPurchases.slice(0, 4),
+        ].slice(0, 8)
+    }
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-[var(--text-primary)] font-heading">Overview</h1>
+          <p className="text-[var(--text-muted)] mt-1">
+            Track your purchases, warranties, and subscriptions
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex items-center bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-xl p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
               </svg>
-            </div>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           </div>
-          <div className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalValue}</div>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">Est. value</p>
-        </Card>
+
+          {/* Create button */}
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[var(--primary)] rounded-xl hover:bg-[var(--primary-hover)] transition-colors shadow-lg shadow-[var(--primary)]/20"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create
+          </button>
+        </div>
       </div>
 
-      {/* Subscription Timeline */}
-      {upcomingCharges.length > 0 && (
-        <Card padding="none">
-          <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Upcoming Charges</h2>
-                <p className="text-sm text-[var(--text-muted)]">Subscription timeline (next 14 days)</p>
-              </div>
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-1 overflow-x-auto pb-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === tab.id
+                ? 'bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+            }`}
+          >
+            {tab.label}
+            {tab.id === 'warranties' && stats.expiringSoon > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-white/20 rounded text-xs">
+                {stats.expiringSoon}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Activity Cards / Live Items Section */}
+      {activeTab !== 'subscriptions' ? (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              {activeTab === 'activity' ? 'Attention Needed' :
+               activeTab === 'warranties' ? 'Expiring Warranties' :
+               activeTab === 'returns' ? 'Return Deadlines' :
+               'Recent Purchases'}
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[var(--text-muted)]">Sort:</span>
+              <select className="bg-transparent text-sm text-[var(--text-primary)] border-none focus:outline-none cursor-pointer">
+                <option>Date</option>
+                <option>Value</option>
+                <option>Name</option>
+              </select>
             </div>
-            <Link href="/subscriptions" className="text-sm font-medium text-[var(--primary)] hover:underline">
+          </div>
+
+          {getActivityItems().length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {getActivityItems().map((item) => (
+                <ActivityCard
+                  key={item.id}
+                  purchase={item}
+                  type={
+                    item.return_deadline ? 'return' :
+                    item.warranty_expires_at ? 'warranty' :
+                    'new'
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-2xl">
+              <p className="text-[var(--text-muted)]">No items to display</p>
+              <button
+                onClick={() => setCreateModalOpen(true)}
+                className="mt-4 text-[var(--primary)] font-medium hover:underline"
+              >
+                Add your first purchase
+              </button>
+            </div>
+          )}
+        </section>
+      ) : (
+        /* Subscriptions Grid */
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Active Subscriptions</h2>
+            <Link href="/subscriptions" className="text-sm text-[var(--primary)] hover:underline">
               View all
             </Link>
           </div>
 
-          <div className="p-5">
-            <div className="relative">
-              {/* Timeline line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-[var(--border)]" />
-
-              <div className="space-y-4">
-                {upcomingCharges.map((charge, index) => (
-                  <Link
-                    key={charge.id}
-                    href={`/subscriptions/${charge.id}`}
-                    className="relative flex items-center gap-4 pl-10 group"
-                  >
-                    {/* Timeline dot */}
-                    <div className={`absolute left-2 w-4 h-4 rounded-full border-2 border-[var(--card)] ${
-                      charge.daysUntil === 0
-                        ? 'bg-red-500'
-                        : charge.daysUntil <= 3
-                        ? 'bg-[var(--warning)]'
-                        : 'bg-purple-500'
-                    }`} />
-
-                    <div className="flex-1 flex items-center justify-between p-3 bg-[var(--surface-subtle)] rounded-xl group-hover:bg-[var(--primary-soft)] transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[var(--card)] flex items-center justify-center text-sm font-bold text-purple-500">
-                          {charge.merchant.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
-                            {charge.merchant}
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {formatDate(charge.chargeDate)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-[var(--text-primary)]">
-                          ${charge.price.toFixed(2)}
-                        </p>
-                        <p className={`text-xs font-medium ${
-                          charge.daysUntil === 0
-                            ? 'text-red-500'
-                            : charge.daysUntil <= 3
-                            ? 'text-[var(--warning)]'
-                            : 'text-[var(--text-muted)]'
-                        }`}>
-                          {getChargeLabel(charge.daysUntil)}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+          {subscriptions.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {subscriptions.filter(s => s.status === 'active').slice(0, 8).map((sub) => (
+                <SubscriptionCard key={sub.id} subscription={sub} />
+              ))}
             </div>
-          </div>
-        </Card>
+          ) : (
+            <div className="text-center py-12 bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-2xl">
+              <p className="text-[var(--text-muted)]">No subscriptions tracked</p>
+              <Link href="/subscriptions" className="mt-4 text-[var(--primary)] font-medium hover:underline block">
+                Add a subscription
+              </Link>
+            </div>
+          )}
+        </section>
       )}
 
-      {/* Two Column Layout */}
+      {/* Charts Row */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Attention Queue */}
-        <Card padding="none">
-          <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Attention Queue</h2>
-              <p className="text-sm text-[var(--text-muted)]">Items needing action</p>
-            </div>
-            <Link href="/purchases?filter=expiring" className="text-sm font-medium text-[var(--primary)] hover:underline">
-              View all
-            </Link>
-          </div>
+        <ChartContainer
+          title="Purchase Activity"
+          subtitle="Purchases over time"
+          action={
+            <ChartPeriodSelector
+              value={chartPeriod}
+              onChange={setChartPeriod}
+            />
+          }
+        >
+          <LineChart
+            data={chartData}
+            xKey="date"
+            lines={[
+              { key: 'purchases', color: 'var(--primary)', name: 'Purchases' },
+            ]}
+            height={240}
+          />
+        </ChartContainer>
 
-          {attentionItems.length === 0 ? (
-            <div className="text-center py-12 px-5">
-              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[var(--success)]/10 flex items-center justify-center">
-                <svg className="w-7 h-7 text-[var(--success)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="font-medium text-[var(--text-primary)] mb-1">All clear!</h3>
-              <p className="text-sm text-[var(--text-muted)]">No items need your attention right now</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--border)]">
-              {attentionItems.map((purchase) => (
-                <Link
-                  key={purchase.id}
-                  href={purchase.category === 'review' ? `/inbox` : `/purchases/${purchase.id}`}
-                  className="flex items-center gap-4 p-4 hover:bg-[var(--surface-subtle)] transition-colors group"
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    purchase.category === 'return'
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                      : purchase.category === 'review'
-                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                      : 'bg-[var(--warning-soft)] text-[var(--warning)]'
-                  }`}>
-                    {purchase.category === 'return' ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                      </svg>
-                    ) : purchase.category === 'review' ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--primary)] transition-colors">
-                      {purchase.item_name}
-                    </p>
-                    <p className="text-sm text-[var(--text-muted)] truncate">
-                      {purchase.category === 'return' ? 'Return deadline' :
-                       purchase.category === 'review' ? 'Needs verification' :
-                       'Warranty expiring'} • {purchase.merchant || 'Unknown'}
-                    </p>
-                  </div>
-
-                  <Badge
-                    variant={purchase.category === 'return' ? 'danger' :
-                             purchase.category === 'review' ? 'info' : 'warning'}
-                    size="sm"
-                  >
-                    {purchase.category === 'review' ? 'Review' :
-                     purchase.urgency >= 0 ? `${purchase.urgency}d` : 'Expired'}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* Recent Captures */}
-        <Card padding="none">
-          <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent Captures</h2>
-              <p className="text-sm text-[var(--text-muted)]">Latest purchases added</p>
-            </div>
-            <Link href="/upload" className="text-sm font-medium text-[var(--primary)] hover:underline">
-              Add new
-            </Link>
-          </div>
-
-          {recentPurchases.length === 0 ? (
-            <div className="text-center py-12 px-5">
-              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[var(--primary-soft)] flex items-center justify-center">
-                <svg className="w-7 h-7 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <h3 className="font-medium text-[var(--text-primary)] mb-1">No purchases yet</h3>
-              <p className="text-sm text-[var(--text-muted)]">Upload your first receipt to get started</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--border)]">
-              {recentPurchases.map((purchase) => (
-                <Link
-                  key={purchase.id}
-                  href={`/purchases/${purchase.id}`}
-                  className="flex items-center gap-4 p-4 hover:bg-[var(--surface-subtle)] transition-colors group"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--primary)] transition-colors">
-                        {purchase.item_name}
-                      </p>
-                      {(purchase as any).auto_detected && (
-                        <Badge variant="info" size="sm">Auto</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      {formatRelativeDate(purchase.created_at)}
-                    </p>
-                  </div>
-
-                  {purchase.price && (
-                    <span className="font-medium text-[var(--text-primary)]">
-                      ${purchase.price.toLocaleString()}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
+        <ChartContainer
+          title="Categories"
+          subtitle="Items by category"
+        >
+          <BarChart
+            data={categoryData}
+            xKey="category"
+            bars={[
+              { key: 'count', color: 'var(--primary)', name: 'Items' },
+            ]}
+            height={240}
+          />
+        </ChartContainer>
       </div>
 
-      {/* Quick Actions */}
-      <Card padding="lg">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Quick Actions</h2>
-        <div className="grid sm:grid-cols-4 gap-4">
-          <Link
-            href="/upload"
-            className="flex items-center gap-3 p-4 rounded-xl border border-[var(--border)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] transition-all group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-[var(--text-primary)]">Upload Receipt</p>
-              <p className="text-sm text-[var(--text-muted)]">Scan or upload</p>
-            </div>
-          </Link>
+      {/* Recent History Table */}
+      <section className="bg-[var(--surface)]/60 backdrop-blur-sm border border-[var(--border)]/50 rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-[var(--border)]/50">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent History</h2>
 
-          <Link
-            href="/inbox"
-            className="flex items-center gap-3 p-4 rounded-xl border border-[var(--border)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] transition-all group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
+            {/* History filter tabs */}
+            <div className="flex items-center gap-1 bg-[var(--surface-subtle)] rounded-xl p-1">
+              {historyFilters.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setHistoryFilter(filter.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    historyFilter === filter.id
+                      ? 'bg-[var(--primary)] text-white'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
             </div>
-            <div>
-              <p className="font-medium text-[var(--text-primary)]">Review Inbox</p>
-              <p className="text-sm text-[var(--text-muted)]">Verify purchases</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/subscriptions"
-            className="flex items-center gap-3 p-4 rounded-xl border border-[var(--border)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] transition-all group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-[var(--text-primary)]">Subscriptions</p>
-              <p className="text-sm text-[var(--text-muted)]">Manage recurring</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 p-4 rounded-xl border border-[var(--border)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] transition-all group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-[var(--text-primary)]">Connect Gmail</p>
-              <p className="text-sm text-[var(--text-muted)]">Auto-sync receipts</p>
-            </div>
-          </Link>
+          </div>
         </div>
-      </Card>
 
-      {/* Keyboard shortcuts hint */}
-      <div className="text-center text-sm text-[var(--text-muted)]">
-        <p>
-          Press <kbd className="px-1.5 py-0.5 bg-[var(--surface-subtle)] rounded border border-[var(--border)]">⌘K</kbd> for quick search,{' '}
-          <kbd className="px-1.5 py-0.5 bg-[var(--surface-subtle)] rounded border border-[var(--border)]">N</kbd> to add new receipt
-        </p>
-      </div>
+        <div className="p-6">
+          {historyData.length > 0 ? (
+            <DataTable
+              data={historyData}
+              columns={columns}
+              searchPlaceholder="Search history..."
+              bulkActions={[
+                {
+                  label: 'Delete',
+                  icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  ),
+                  onClick: handleBulkDelete,
+                  variant: 'danger',
+                },
+              ]}
+              emptyState={
+                <EmptyState
+                  title="No history yet"
+                  description="Start tracking your purchases to see your history here."
+                  action={{
+                    label: 'Add your first purchase',
+                    onClick: () => setCreateModalOpen(true),
+                  }}
+                />
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No history yet"
+              description="Start tracking your purchases to see your history here."
+              action={{
+                label: 'Add your first purchase',
+                onClick: () => setCreateModalOpen(true),
+              }}
+            />
+          )}
+        </div>
+
+        {historyData.length > 0 && (
+          <div className="px-6 pb-6">
+            <Link
+              href="/purchases"
+              className="text-sm font-medium text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors"
+            >
+              View all purchases →
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* Create Modal */}
+      <CreateEditModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        title="Add New Purchase"
+        description="Track a new purchase or warranty"
+        schema={purchaseSchema}
+        onSubmit={(data) => createMutation.mutate(data)}
+        isLoading={createMutation.isPending}
+        fields={[
+          {
+            name: 'item_name',
+            label: 'Item Name',
+            placeholder: 'e.g., MacBook Pro 14"',
+            required: true,
+          },
+          {
+            name: 'merchant',
+            label: 'Merchant',
+            placeholder: 'e.g., Apple Store',
+            required: true,
+          },
+          {
+            name: 'price',
+            label: 'Price',
+            type: 'number',
+            placeholder: '0.00',
+            required: true,
+          },
+          {
+            name: 'purchase_date',
+            label: 'Purchase Date',
+            type: 'date',
+            required: true,
+          },
+          {
+            name: 'warranty_expires_at',
+            label: 'Warranty Expiry',
+            type: 'date',
+            hint: 'Leave empty if no warranty',
+          },
+        ]}
+      />
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete purchases?"
+        description={`Are you sure you want to delete ${selectedForDelete.length} purchase(s)? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        isLoading={deleteMutation.isPending}
+        variant="danger"
+      />
     </div>
   )
 }

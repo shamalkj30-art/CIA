@@ -1,6 +1,7 @@
 export { AppSidebar, SidebarProvider, useSidebar } from './AppSidebar'
 export { CommandPalette, CommandPaletteButton } from './CommandPalette'
 export { QuickAddMenu, QuickAddFAB } from './QuickAddMenu'
+export { AnimatedBackground } from './AnimatedBackground'
 export { ProofScoreBadge, ProofScoreIcon } from './ProofScoreBadge'
 export { NeedsReviewBanner } from './NeedsReviewBanner'
 export { TrustIndicator, PurchaseTrustIndicator, ConfidenceBadge } from './TrustIndicator'

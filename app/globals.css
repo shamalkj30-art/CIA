@@ -848,6 +848,21 @@ a {
   animation: pulse-subtle 3s ease-in-out infinite;
 }
 
+/* Gradient X animation for buttons */
+@keyframes gradient-x {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-x {
+  animation: gradient-x 3s ease infinite;
+}
+
+.group:hover .group-hover\:animate-gradient-x {
+  animation: gradient-x 3s ease infinite;
+}
+
 /* Hover lift effect */
 .hover-lift {
   transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
