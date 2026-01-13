@@ -166,6 +166,17 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
       required: ['subscription_id'],
     },
   },
+  {
+    name: 'delete_subscription',
+    description: 'Delete a subscription from tracking. Only call this if the user explicitly confirms deletion.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Subscription ID to delete' },
+      },
+      required: ['id'],
+    },
+  },
 
   // -------------------------------------------------------------------------
   // CASES TOOLS
@@ -324,6 +335,9 @@ export async function executeTool(
         break
       case 'generate_cancel_kit':
         output = await generateCancelKit(toolInput.subscription_id as string)
+        break
+      case 'delete_subscription':
+        output = await deleteSubscription(supabase, userId, toolInput.id as string)
         break
 
       // Cases
@@ -593,6 +607,21 @@ async function generateCancelKit(subscriptionId: string): Promise<{ redirect_url
   return {
     redirect_url: `/api/subscriptions/${subscriptionId}/cancel-kit`,
   }
+}
+
+async function deleteSubscription(
+  supabase: SupabaseClient,
+  userId: string,
+  id: string
+): Promise<{ success: boolean; message: string }> {
+  const { error } = await supabase
+    .from('subscriptions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) throw error
+  return { success: true, message: 'Subscription deleted successfully' }
 }
 
 // =============================================================================

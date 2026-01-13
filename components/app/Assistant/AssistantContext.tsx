@@ -21,6 +21,8 @@ interface UIMessage extends Omit<AssistantMessage, 'conversation_id' | 'user_id'
   toolCalls?: ToolCallRecord[]
 }
 
+const CONVERSATION_STORAGE_KEY = 'cyncro_assistant_conversation_id'
+
 interface AssistantContextType {
   // Panel state
   isOpen: boolean
@@ -98,6 +100,39 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Restore conversation from localStorage on mount
+  useEffect(() => {
+    const storedConversationId = localStorage.getItem(CONVERSATION_STORAGE_KEY)
+    if (storedConversationId) {
+      // Load the conversation from the database
+      fetch(`/api/assistant/conversations/${storedConversationId}`)
+        .then(res => {
+          if (!res.ok) {
+            // Conversation no longer exists, clear storage
+            localStorage.removeItem(CONVERSATION_STORAGE_KEY)
+            return null
+          }
+          return res.json()
+        })
+        .then(data => {
+          if (data && data.conversation) {
+            setConversation(data.conversation)
+            setMessages(
+              data.conversation.messages.map((m: AssistantMessage) => ({
+                ...m,
+                isStreaming: false,
+                toolCalls: m.tool_calls || [],
+              }))
+            )
+          }
+        })
+        .catch(err => {
+          console.error('Failed to restore conversation:', err)
+          localStorage.removeItem(CONVERSATION_STORAGE_KEY)
+        })
+    }
+  }, [])
+
   const toggleOpen = useCallback(() => {
     setIsOpen(prev => !prev)
   }, [])
@@ -169,6 +204,8 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
 
             switch (data.type) {
               case 'conversation_id':
+                // Save conversation ID to localStorage for persistence
+                localStorage.setItem(CONVERSATION_STORAGE_KEY, data.conversation_id)
                 if (data.is_new) {
                   setConversation({
                     id: data.conversation_id,
@@ -245,6 +282,7 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
 
   // Start a new conversation
   const startNewConversation = useCallback(() => {
+    localStorage.removeItem(CONVERSATION_STORAGE_KEY)
     setConversation(null)
     setMessages([])
   }, [])
