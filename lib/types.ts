@@ -600,3 +600,68 @@ export interface VaultStats {
   total_insurance_value: number
   expiring_soon: number // items expiring in next 30 days
 }
+
+// =============================================================================
+// ASSISTANT TYPES
+// =============================================================================
+
+export type AssistantContextType = 'global' | 'purchase' | 'subscription' | 'case' | 'vault_item'
+
+export interface AssistantConversation {
+  id: string
+  user_id: string
+  title: string | null
+  started_page: string | null
+  context_type: AssistantContextType | null
+  context_id: string | null
+  created_at: string
+  updated_at: string
+  last_message_at: string
+}
+
+export interface AssistantMessage {
+  id: string
+  conversation_id: string
+  user_id: string
+  role: 'user' | 'assistant'
+  content: string
+  tool_calls: ToolCallRecord[] | null
+  tokens_used: number | null
+  model: string
+  created_at: string
+}
+
+export interface ToolCallRecord {
+  tool_name: string
+  input: Record<string, unknown>
+  output: unknown
+  success: boolean
+}
+
+export interface PageContext {
+  page: string
+  itemId?: string
+  itemType?: AssistantContextType
+  itemData?: Record<string, unknown>
+}
+
+export interface ConversationWithMessages extends AssistantConversation {
+  messages: AssistantMessage[]
+}
+
+// Chat request/response types
+export interface ChatRequest {
+  message: string
+  conversation_id?: string
+  context: PageContext
+}
+
+export interface StreamEvent {
+  type: 'content' | 'tool_call' | 'tool_result' | 'done' | 'error'
+  text?: string
+  tool_name?: string
+  tool_input?: Record<string, unknown>
+  tool_output?: unknown
+  conversation_id?: string
+  error?: string
+}

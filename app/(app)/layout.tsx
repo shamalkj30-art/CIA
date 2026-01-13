@@ -1,6 +1,7 @@
 'use client'
 
 import { AppSidebar, SidebarProvider, useSidebar, CommandPalette, QuickAddFAB, AnimatedBackground } from '@/components/app'
+import { AssistantProvider, AssistantPanel } from '@/components/app/Assistant'
 
 function AppContent({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar()
@@ -25,15 +26,18 @@ export default function AppLayout({
 }) {
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-[var(--background)] relative overflow-hidden">
-        {/* Animated Background */}
-        <AnimatedBackground />
+      <AssistantProvider>
+        <div className="min-h-screen bg-[var(--background)] relative overflow-hidden">
+          {/* Animated Background */}
+          <AnimatedBackground />
 
-        <AppSidebar />
-        <AppContent>{children}</AppContent>
-        <QuickAddFAB />
-        <CommandPalette />
-      </div>
+          <AppSidebar />
+          <AppContent>{children}</AppContent>
+          <QuickAddFAB />
+          <CommandPalette />
+          <AssistantPanel />
+        </div>
+      </AssistantProvider>
     </SidebarProvider>
   )
 }
