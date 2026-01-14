@@ -21,23 +21,29 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user'
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`
-          max-w-[85%] rounded-2xl px-4 py-2.5
-          ${
-            isUser
-              ? 'bg-[var(--primary)] text-white rounded-br-md'
-              : 'bg-[var(--surface-subtle)] text-[var(--text-primary)] rounded-bl-md'
-          }
-        `}
-      >
-        {/* Tool calls indicator */}
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mb-2">
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+      {/* Avatar */}
+      {!isUser && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            />
+          </svg>
+        </div>
+      )}
+
+      {/* Message content */}
+      <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[85%]`}>
+        {/* Tool calls indicator - shown above message for assistant */}
+        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+          <div className="mb-1.5">
             <button
               onClick={() => setShowToolDetails(!showToolDetails)}
-              className="flex items-center gap-1.5 text-xs opacity-70 hover:opacity-100 transition-opacity"
+              className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -67,7 +73,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </button>
 
             {showToolDetails && (
-              <div className="mt-2 space-y-1.5">
+              <div className="mt-1.5 ml-5 space-y-1">
                 {message.toolCalls.map((tc, idx) => (
                   <ToolCallDisplay key={idx} toolCall={tc} />
                 ))}
@@ -76,16 +82,37 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         )}
 
-        {/* Message content */}
-        <div className="text-sm whitespace-pre-wrap break-words">
-          {message.content}
-          {message.isStreaming && (
-            <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse rounded-sm" />
-          )}
+        {/* Message bubble */}
+        <div
+          className={`
+            rounded-2xl px-4 py-2.5
+            ${
+              isUser
+                ? 'bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-br-md shadow-md'
+                : 'bg-[var(--surface-subtle)] text-[var(--text-primary)] rounded-bl-md border border-[var(--border)]'
+            }
+          `}
+        >
+          <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+            {message.content}
+            {message.isStreaming && (
+              <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse rounded-sm" />
+            )}
+          </div>
         </div>
+
+        {/* Timestamp */}
+        <span className="text-[10px] text-[var(--text-muted)] mt-1 px-1">
+          {formatTime(message.created_at)}
+        </span>
       </div>
     </div>
   )
+}
+
+function formatTime(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCallRecord }) {
@@ -97,6 +124,7 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCallRecord }) {
     delete_purchase: 'Deleted purchase',
     list_subscriptions: 'Fetched your subscriptions',
     create_subscription: 'Created new subscription',
+    delete_subscription: 'Deleted subscription',
     generate_cancel_kit: 'Generated cancellation guide',
     list_cases: 'Fetched your cases',
     create_case: 'Created new case',
@@ -106,7 +134,7 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCallRecord }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-xs opacity-70">
+    <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
       {toolCall.success ? (
         <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
           <path

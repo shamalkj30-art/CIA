@@ -39,7 +39,7 @@ interface AssistantContextType {
   setPageContext: (ctx: Partial<PageContext>) => void
 
   // Actions
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, files?: File[]) => Promise<void>
   startNewConversation: () => void
   loadConversation: (id: string) => Promise<void>
 }
@@ -138,16 +138,31 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
   }, [])
 
   // Send message with streaming
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return
+  const sendMessage = useCallback(async (content: string, files?: File[]) => {
+    if ((!content.trim() && (!files || files.length === 0)) || isLoading) return
 
     setIsLoading(true)
+
+    // Build message content including file info
+    let displayContent = content
+    let messageWithFiles = content
+
+    if (files && files.length > 0) {
+      const fileNames = files.map(f => f.name).join(', ')
+      if (displayContent) {
+        displayContent = `${displayContent}\n\n📎 Attached: ${fileNames}`
+      } else {
+        displayContent = `📎 Attached: ${fileNames}`
+      }
+      // Add file context for the AI
+      messageWithFiles = `${content}\n\n[User attached ${files.length} file(s): ${fileNames}. The files have been uploaded for reference.]`
+    }
 
     // Add user message optimistically
     const userMessage: UIMessage = {
       id: `temp-user-${Date.now()}`,
       role: 'user',
-      content,
+      content: displayContent,
       tool_calls: null,
       created_at: new Date().toISOString(),
     }
@@ -171,7 +186,7 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: content,
+          message: messageWithFiles,
           conversation_id: conversation?.id,
           context: pageContext,
         }),
@@ -210,7 +225,7 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
                   setConversation({
                     id: data.conversation_id,
                     user_id: '',
-                    title: content.substring(0, 50),
+                    title: (content || 'File attachment').substring(0, 50),
                     started_page: pageContext.page,
                     context_type: pageContext.itemType || 'global',
                     context_id: pageContext.itemId || null,

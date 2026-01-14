@@ -17,10 +17,13 @@ export function AssistantPanel() {
   } = useAssistant()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when messages change (including streaming updates)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    }
   }, [messages])
 
   // Close on escape key
@@ -154,7 +157,7 @@ export function AssistantPanel() {
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-6">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center mb-4">
@@ -208,7 +211,7 @@ export function AssistantPanel() {
 
         {/* Input area */}
         <div className="border-t border-[var(--border)] bg-[var(--surface)] p-4">
-          <ChatInput onSend={sendMessage} isLoading={isLoading} />
+          <ChatInput onSend={(msg, files) => sendMessage(msg, files)} isLoading={isLoading} />
           <p className="text-[10px] text-[var(--text-muted)] text-center mt-2">
             Press <kbd className="px-1 py-0.5 rounded bg-[var(--surface-subtle)] font-mono">Cmd+/</kbd> to toggle
           </p>
