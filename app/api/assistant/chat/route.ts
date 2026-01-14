@@ -3,7 +3,69 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { ASSISTANT_TOOLS, executeTool } from '@/lib/assistant-tools'
 import { buildSystemPrompt, generateConversationTitle } from '@/lib/assistant-system-prompt'
-import type { ChatRequest, ToolCallRecord } from '@/lib/types'
+import type { ChatRequest, ToolCallRecord, ChatAttachment } from '@/lib/types'
+
+// Helper to convert attachment to Claude image content
+function attachmentToImageContent(attachment: ChatAttachment): Anthropic.ImageBlockParam | null {
+  // Check if it's an image type
+  if (!attachment.type.startsWith('image/')) {
+    return null
+  }
+
+  // Map MIME types to Claude-supported types
+  let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg'
+
+  if (attachment.type === 'image/png') {
+    mediaType = 'image/png'
+  } else if (attachment.type === 'image/gif') {
+    mediaType = 'image/gif'
+  } else if (attachment.type === 'image/webp') {
+    mediaType = 'image/webp'
+  }
+  // For other image types (heic, tiff, bmp), default to jpeg
+
+  return {
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: mediaType,
+      data: attachment.data,
+    },
+  }
+}
+
+// Build multimodal content from message and attachments
+function buildMessageContent(message: string, attachments?: ChatAttachment[]): Anthropic.ContentBlockParam[] | string {
+  if (!attachments || attachments.length === 0) {
+    return message
+  }
+
+  const content: Anthropic.ContentBlockParam[] = []
+
+  // Add image attachments first
+  for (const attachment of attachments) {
+    const imageContent = attachmentToImageContent(attachment)
+    if (imageContent) {
+      content.push(imageContent)
+    }
+  }
+
+  // Add the text message
+  if (message.trim()) {
+    content.push({
+      type: 'text',
+      text: message,
+    })
+  } else {
+    // Default message when only files are attached
+    content.push({
+      type: 'text',
+      text: 'Please analyze the attached file(s) and extract any relevant information.',
+    })
+  }
+
+  return content
+}
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -28,13 +90,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body: ChatRequest = await request.json()
-    const { message, conversation_id, context } = body
+    const { message, conversation_id, context, attachments } = body
 
-    if (!message?.trim()) {
+    if (!message?.trim() && (!attachments || attachments.length === 0)) {
       return new Response(
-        JSON.stringify({ error: 'Message is required' }),
+        JSON.stringify({ error: 'Message or attachments required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Log attachment info
+    if (attachments && attachments.length > 0) {
+      console.log(`[Assistant] Received ${attachments.length} attachment(s):`, attachments.map(a => ({ name: a.name, type: a.type, size: a.size })))
     }
 
     // Create streaming response
@@ -99,7 +166,10 @@ export async function POST(request: NextRequest) {
               role: m.role as 'user' | 'assistant',
               content: m.content,
             })),
-            { role: 'user', content: message },
+            {
+              role: 'user',
+              content: buildMessageContent(message || '', attachments),
+            },
           ]
 
           // Initialize Anthropic client

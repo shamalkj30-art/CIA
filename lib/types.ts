@@ -649,11 +649,20 @@ export interface ConversationWithMessages extends AssistantConversation {
   messages: AssistantMessage[]
 }
 
+// File attachment for chat
+export interface ChatAttachment {
+  name: string
+  type: string // MIME type
+  data: string // base64 encoded
+  size: number
+}
+
 // Chat request/response types
 export interface ChatRequest {
   message: string
   conversation_id?: string
   context: PageContext
+  attachments?: ChatAttachment[]
 }
 
 export interface StreamEvent {

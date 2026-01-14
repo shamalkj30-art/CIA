@@ -119,7 +119,7 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCallRecord }) {
   const toolLabels: Record<string, string> = {
     list_purchases: 'Fetched your purchases',
     get_purchase: 'Got purchase details',
-    create_purchase: 'Created new purchase',
+    create_purchase: 'Added purchase from receipt',
     update_purchase: 'Updated purchase',
     delete_purchase: 'Deleted purchase',
     list_subscriptions: 'Fetched your subscriptions',

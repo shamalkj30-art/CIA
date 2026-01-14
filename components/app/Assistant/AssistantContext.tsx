@@ -14,6 +14,7 @@ import type {
   AssistantMessage,
   PageContext,
   ToolCallRecord,
+  ChatAttachment,
 } from '@/lib/types'
 
 interface UIMessage extends Omit<AssistantMessage, 'conversation_id' | 'user_id' | 'tokens_used' | 'model'> {
@@ -137,6 +138,21 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
     setIsOpen(prev => !prev)
   }, [])
 
+  // Helper function to convert File to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        // Remove the data URL prefix (e.g., "data:image/png;base64,")
+        const base64 = result.split(',')[1]
+        resolve(base64)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   // Send message with streaming
   const sendMessage = useCallback(async (content: string, files?: File[]) => {
     if ((!content.trim() && (!files || files.length === 0)) || isLoading) return
@@ -146,6 +162,7 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
     // Build message content including file info
     let displayContent = content
     let messageWithFiles = content
+    let attachments: ChatAttachment[] = []
 
     if (files && files.length > 0) {
       const fileNames = files.map(f => f.name).join(', ')
@@ -154,8 +171,24 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
       } else {
         displayContent = `📎 Attached: ${fileNames}`
       }
-      // Add file context for the AI
-      messageWithFiles = `${content}\n\n[User attached ${files.length} file(s): ${fileNames}. The files have been uploaded for reference.]`
+
+      // Convert files to base64 for sending to API
+      try {
+        attachments = await Promise.all(
+          files.map(async (file) => ({
+            name: file.name,
+            type: file.type,
+            data: await fileToBase64(file),
+            size: file.size,
+          }))
+        )
+        // Add file context for the AI
+        messageWithFiles = content.trim() || `I've attached ${files.length} file(s) for you to analyze.`
+      } catch (error) {
+        console.error('Error converting files to base64:', error)
+        setIsLoading(false)
+        return
+      }
     }
 
     // Add user message optimistically
@@ -189,6 +222,7 @@ export function AssistantProvider({ children }: AssistantProviderProps) {
           message: messageWithFiles,
           conversation_id: conversation?.id,
           context: pageContext,
+          attachments: attachments.length > 0 ? attachments : undefined,
         }),
       })
 
