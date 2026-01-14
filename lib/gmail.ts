@@ -1,6 +1,7 @@
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
+import { getLLMProvider } from '@/lib/llm'
+import type { Tool } from '@/lib/llm'
 import type { OrderExtractionResult } from './types'
 
 // Google OAuth configuration
@@ -76,11 +77,6 @@ function getSupabaseAdmin() {
   )
 }
 
-// Get Anthropic client
-function getAnthropicClient() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-}
-
 // AI system prompt for Gmail order extraction (using Claude)
 const GMAIL_EXTRACTION_PROMPT = `You are an expert at analyzing emails to detect online order confirmations.
 
@@ -123,11 +119,11 @@ The merchant is the STORE that sold the product.
 - Euro: €, EUR → "EUR"
 - US Dollar: $, USD → "USD"`
 
-// Tool definition for Claude structured extraction
-const GMAIL_EXTRACTION_TOOL: Anthropic.Tool = {
+// Tool definition for structured extraction (unified format)
+const GMAIL_EXTRACTION_TOOL: Tool = {
   name: 'extract_order_data',
   description: 'Extract structured order information from an email',
-  input_schema: {
+  parameters: {
     type: 'object',
     properties: {
       is_order_confirmation: {
@@ -136,8 +132,7 @@ const GMAIL_EXTRACTION_TOOL: Anthropic.Tool = {
       },
       confidence: {
         type: 'string',
-        enum: ['high', 'medium', 'low'],
-        description: 'Confidence level of the extraction'
+        description: 'Confidence level: high, medium, or low'
       },
       order_number: {
         type: 'string',
@@ -145,16 +140,6 @@ const GMAIL_EXTRACTION_TOOL: Anthropic.Tool = {
       },
       items: {
         type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string' },
-            price: { type: 'number' },
-            quantity: { type: 'number' },
-            category: { type: 'string' }
-          },
-          required: ['name', 'quantity']
-        },
         description: 'List of items purchased'
       },
       merchant: {
@@ -199,7 +184,7 @@ export async function analyzeEmailForOrder(
   body: string,
   sender: string
 ): Promise<OrderExtractionResult> {
-  const anthropic = getAnthropicClient()
+  const llm = getLLMProvider()
 
   // Don't include sender email domain - it confuses the AI
   const senderName = sender.split('<')[0].trim() || sender.split('@')[0]
@@ -214,39 +199,62 @@ ${body.slice(0, 6000)}
 Use the extract_order_data tool to return structured data.`
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2048,
-      system: GMAIL_EXTRACTION_PROMPT,
-      tools: [GMAIL_EXTRACTION_TOOL],
-      tool_choice: { type: 'tool', name: 'extract_order_data' },
-      messages: [{ role: 'user', content: emailContent }]
-    })
-
-    // Extract tool use result
-    const toolUse = response.content.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+    const response = await llm.chat(
+      [{ role: 'user', content: emailContent }],
+      {
+        maxTokens: 2048,
+        systemPrompt: GMAIL_EXTRACTION_PROMPT,
+        tools: [GMAIL_EXTRACTION_TOOL],
+      }
     )
 
-    if (toolUse && toolUse.name === 'extract_order_data') {
-      const result = toolUse.input as any
-      return {
-        is_order_confirmation: result.is_order_confirmation ?? false,
-        confidence: result.confidence || 'low',
-        order_number: result.order_number || null,
-        items: result.items || [],
-        merchant: result.merchant || null,
-        order_date: result.order_date || null,
-        total_amount: result.total_amount || null,
-        currency: result.currency || null,
-        return_deadline: result.return_deadline || null,
-        warranty_months: result.warranty_months || null,
-        tracking_number: result.tracking_number || null,
-        estimated_delivery: result.estimated_delivery || null,
+    // Extract tool use result (if the model called the tool)
+    if (response.toolCalls.length > 0) {
+      const toolCall = response.toolCalls.find(tc => tc.name === 'extract_order_data')
+      if (toolCall) {
+        const result = toolCall.input as Record<string, unknown>
+        const confidence = (result.confidence as string) || 'low'
+        return {
+          is_order_confirmation: (result.is_order_confirmation as boolean) ?? false,
+          confidence: confidence as 'high' | 'medium' | 'low',
+          order_number: (result.order_number as string) || null,
+          items: (result.items || []) as OrderExtractionResult['items'],
+          merchant: (result.merchant as string) || null,
+          order_date: (result.order_date as string) || null,
+          total_amount: (result.total_amount as number) || null,
+          currency: (result.currency as string) || null,
+          return_deadline: (result.return_deadline as string) || null,
+          warranty_months: (result.warranty_months as number) || null,
+          tracking_number: (result.tracking_number as string) || null,
+          estimated_delivery: (result.estimated_delivery as string) || null,
+        }
+      }
+    }
+
+    // Fallback: try to parse JSON from text response
+    if (response.content) {
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0])
+        const confidence = result.confidence || 'low'
+        return {
+          is_order_confirmation: result.is_order_confirmation ?? false,
+          confidence: confidence as 'high' | 'medium' | 'low',
+          order_number: result.order_number || null,
+          items: (result.items || []) as OrderExtractionResult['items'],
+          merchant: result.merchant || null,
+          order_date: result.order_date || null,
+          total_amount: result.total_amount || null,
+          currency: result.currency || null,
+          return_deadline: result.return_deadline || null,
+          warranty_months: result.warranty_months || null,
+          tracking_number: result.tracking_number || null,
+          estimated_delivery: result.estimated_delivery || null,
+        }
       }
     }
   } catch (error) {
-    console.error('Claude extraction error:', error)
+    console.error('LLM extraction error:', error)
   }
 
   return {

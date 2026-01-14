@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { ASSISTANT_TOOLS, executeTool } from '@/lib/assistant-tools'
 import { buildSystemPrompt, generateConversationTitle } from '@/lib/assistant-system-prompt'
 import type { ChatRequest, ToolCallRecord, ChatAttachment } from '@/lib/types'
+import { getLLMProvider, convertFromAnthropicTools } from '@/lib/llm'
+import type { Message, MessageContent, Tool } from '@/lib/llm'
 
 // Uploaded file metadata type
 interface UploadedFileMetadata {
@@ -98,13 +99,13 @@ async function extractPdfText(attachment: ChatAttachment): Promise<string | null
   }
 }
 
-// Helper to convert attachment to Claude image content
-function attachmentToImageContent(attachment: ChatAttachment): Anthropic.ImageBlockParam | null {
+// Helper to convert attachment to unified image content
+function attachmentToImageContent(attachment: ChatAttachment): MessageContent | null {
   if (!isImage(attachment)) {
     return null
   }
 
-  // Map MIME types to Claude-supported types
+  // Map MIME types to supported types
   let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg'
 
   if (attachment.type === 'image/png') {
@@ -120,7 +121,7 @@ function attachmentToImageContent(attachment: ChatAttachment): Anthropic.ImageBl
     type: 'image',
     source: {
       type: 'base64',
-      media_type: mediaType,
+      mediaType: mediaType,
       data: attachment.data,
     },
   }
@@ -128,7 +129,7 @@ function attachmentToImageContent(attachment: ChatAttachment): Anthropic.ImageBl
 
 // Result of building message content
 interface MessageBuildResult {
-  content: Anthropic.ContentBlockParam[] | string
+  content: MessageContent[] | string
   uploadedFiles: UploadedFileMetadata[]
 }
 
@@ -143,7 +144,7 @@ async function buildMessageContent(
     return { content: message, uploadedFiles: [] }
   }
 
-  const content: Anthropic.ContentBlockParam[] = []
+  const content: MessageContent[] = []
   const pdfTexts: { name: string; text: string }[] = []
   const processedFiles: string[] = []
   const unsupportedFiles: string[] = []
@@ -325,28 +326,27 @@ export async function POST(request: NextRequest) {
             content: message,
           })
 
-          // Build messages array for Claude (including file upload)
+          // Build messages array for LLM (including file upload)
           const { content: messageContent, uploadedFiles } = await buildMessageContent(
             message || '',
             attachments,
             supabase,
             user.id
           )
-          const messages: Anthropic.MessageParam[] = [
+          const messages: Message[] = [
             ...(history || []).map(m => ({
               role: m.role as 'user' | 'assistant',
               content: m.content,
             })),
             {
-              role: 'user',
+              role: 'user' as const,
               content: messageContent,
             },
           ]
 
-          // Initialize Anthropic client
-          const anthropic = new Anthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY!,
-          })
+          // Get LLM provider (configurable via LLM_PROVIDER env var)
+          const llm = getLLMProvider()
+          const tools = convertFromAnthropicTools(ASSISTANT_TOOLS)
 
           // Start streaming response
           let fullContent = ''
@@ -361,86 +361,86 @@ export async function POST(request: NextRequest) {
             loopCount++
             console.log(`[Assistant] API call #${loopCount}`)
 
-            // Using non-streaming for now to debug empty responses
-            const response = await anthropic.messages.create({
-              model: 'claude-sonnet-4-5-20250929',
-              max_tokens: 4096,
-              system: buildSystemPrompt(context),
-              tools: ASSISTANT_TOOLS,
-              messages,
+            // Call LLM using unified interface
+            const response = await llm.chat(messages, {
+              maxTokens: 4096,
+              systemPrompt: buildSystemPrompt(context),
+              tools,
             })
 
-            console.log(`[Assistant] Response stop_reason: ${response.stop_reason}`)
-            console.log(`[Assistant] Response content blocks: ${response.content.length}`)
+            console.log(`[Assistant] Response stop_reason: ${response.stopReason}`)
+            console.log(`[Assistant] Response has content: ${!!response.content}`)
+            console.log(`[Assistant] Response tool calls: ${response.toolCalls.length}`)
 
-            // Process response content
-            for (const block of response.content) {
-              console.log(`[Assistant] Processing block type: ${block.type}`)
+            // Process text content
+            if (response.content) {
+              fullContent += response.content
+              // Send text in chunks for a streaming-like experience
+              controller.enqueue(sendEvent({
+                type: 'content',
+                text: response.content,
+              }))
+            }
 
-              if (block.type === 'text') {
-                fullContent += block.text
-                // Send text in chunks for a streaming-like experience
-                controller.enqueue(sendEvent({
-                  type: 'content',
-                  text: block.text,
-                }))
-              } else if (block.type === 'tool_use') {
-                controller.enqueue(sendEvent({
-                  type: 'tool_call',
-                  tool_name: block.name,
-                }))
+            // Process tool calls
+            for (const toolCall of response.toolCalls) {
+              console.log(`[Assistant] Processing tool call: ${toolCall.name}`)
 
-                // Execute the tool
-                console.log(`[Assistant] Executing tool: ${block.name}`)
-                const result = await executeTool(
-                  block.name,
-                  block.input as Record<string, unknown>,
-                  { supabase, userId: user.id }
-                )
-                toolCalls.push(result)
-                console.log(`[Assistant] Tool result success: ${result.success}`)
+              controller.enqueue(sendEvent({
+                type: 'tool_call',
+                tool_name: toolCall.name,
+              }))
 
-                controller.enqueue(sendEvent({
-                  type: 'tool_result',
-                  tool_name: block.name,
-                  success: result.success,
-                  output: result.output,
-                }))
+              // Execute the tool
+              console.log(`[Assistant] Executing tool: ${toolCall.name}`)
+              const result = await executeTool(
+                toolCall.name,
+                toolCall.input,
+                { supabase, userId: user.id }
+              )
+              toolCalls.push(result)
+              console.log(`[Assistant] Tool result success: ${result.success}`)
 
-                // Add tool use and result to messages for continuation
-                messages.push({
-                  role: 'assistant',
-                  content: [
-                    {
-                      type: 'tool_use',
-                      id: block.id,
-                      name: block.name,
-                      input: block.input,
-                    },
-                  ],
-                })
-                messages.push({
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'tool_result',
-                      tool_use_id: block.id,
-                      content: JSON.stringify(result.output),
-                    },
-                  ],
-                })
-              }
+              controller.enqueue(sendEvent({
+                type: 'tool_result',
+                tool_name: toolCall.name,
+                success: result.success,
+                output: result.output,
+              }))
+
+              // Add tool use and result to messages for continuation
+              messages.push({
+                role: 'assistant',
+                content: [
+                  {
+                    type: 'tool_use',
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    input: toolCall.input,
+                  },
+                ],
+              })
+              messages.push({
+                role: 'user',
+                content: [
+                  {
+                    type: 'tool_result',
+                    toolUseId: toolCall.id,
+                    content: JSON.stringify(result.output),
+                  },
+                ],
+              })
             }
 
             // Check if we need to continue (tool_use means we need another round)
-            if (response.stop_reason === 'tool_use') {
+            if (response.stopReason === 'tool_use') {
               continueLoop = true
               console.log(`[Assistant] Continue loop for tool results`)
             } else {
               continueLoop = false
             }
 
-            console.log(`[Assistant] Loop #${loopCount} completed, stop_reason: ${response.stop_reason}, continueLoop: ${continueLoop}`)
+            console.log(`[Assistant] Loop #${loopCount} completed, stop_reason: ${response.stopReason}, continueLoop: ${continueLoop}`)
           }
 
           console.log(`[Assistant] Final content length: ${fullContent.length}, toolCalls: ${toolCalls.length}`)

@@ -1,20 +1,12 @@
 /**
  * Manual Receipt Upload Analysis
- * Uses Anthropic Claude for consistent, high-quality extraction
+ * Uses LLM abstraction layer for consistent, high-quality extraction
+ * Supports switching between Anthropic, OpenAI, or Google via LLM_PROVIDER env var
  */
 
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-
-function getAnthropicClient() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured. Please add it to your environment variables.')
-  }
-  return new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  })
-}
+import { getLLMProvider } from '@/lib/llm'
 
 interface ReceiptAnalysis {
   item_name?: string
@@ -73,10 +65,10 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer()
-    const anthropic = getAnthropicClient()
-    let completion
+    const llm = getLLMProvider()
+    let responseContent: string
 
-    // Handle PDF - extract text and analyze with Claude
+    // Handle PDF - extract text and analyze with LLM
     const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf')
 
     if (isPdf) {
@@ -96,14 +88,8 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // Analyze extracted text with Claude (text-only)
-        completion = await anthropic.messages.create({
-          model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 1024,
-          messages: [
-            {
-              role: 'user',
-              content: `Extract purchase information from this receipt text and return ONLY valid JSON.
+        // Analyze extracted text with LLM (text-only)
+        const pdfPrompt = `Extract purchase information from this receipt text and return ONLY valid JSON.
 
 Receipt text:
 ${pdfText}
@@ -131,9 +117,12 @@ Example:
 }
 
 Return ONLY the JSON object, no other text.`
-            }
-          ]
-        })
+
+        const response = await llm.chat(
+          [{ role: 'user', content: pdfPrompt }],
+          { maxTokens: 1024 }
+        )
+        responseContent = response.content
       } catch (pdfError: any) {
         console.error('PDF processing error:', pdfError)
         return NextResponse.json(
@@ -145,10 +134,10 @@ Return ONLY the JSON object, no other text.`
         )
       }
     } else {
-      // Handle images - use Claude's Vision API
+      // Handle images - use LLM Vision API
       const base64 = Buffer.from(arrayBuffer).toString('base64')
 
-      // Determine correct MIME type for Claude
+      // Determine correct MIME type
       let mimeType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg'
 
       if (file.type === 'image/png' || fileName.endsWith('.png')) {
@@ -159,26 +148,8 @@ Return ONLY the JSON object, no other text.`
         mimeType = 'image/webp'
       }
       // HEIC, TIFF, BMP need conversion - for now treat as JPEG
-      // (Claude supports jpeg, png, gif, webp)
 
-      completion = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mimeType,
-                  data: base64,
-                },
-              },
-              {
-                type: 'text',
-                text: `Analyze this receipt image and extract purchase information. Return ONLY valid JSON.
+      const visionPrompt = `Analyze this receipt image and extract purchase information. Return ONLY valid JSON.
 
 Return a JSON object with these fields:
 - item_name: Main product/item purchased (be specific, combine multiple items if needed)
@@ -208,20 +179,11 @@ IMPORTANT:
 - If multiple items, list the main one or say "Multiple items from [Store]"
 
 Return ONLY the JSON object, no other text.`
-              }
-            ]
-          }
-        ]
-      })
+
+      responseContent = await llm.vision(base64, mimeType, visionPrompt, { maxTokens: 1024 })
     }
 
-    // Extract text from Claude's response
-    const textBlock = completion.content.find(
-      (block): block is Anthropic.TextBlock => block.type === 'text'
-    )
-
-    const content = textBlock?.text
-    if (!content) {
+    if (!responseContent) {
       return NextResponse.json({ error: 'Failed to analyze receipt' }, { status: 500 })
     }
 
@@ -229,13 +191,13 @@ Return ONLY the JSON object, no other text.`
     let analysis: ReceiptAnalysis
     try {
       // Clean the response in case there's extra text
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      const jsonMatch = responseContent.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
         throw new Error('No JSON found in response')
       }
       analysis = JSON.parse(jsonMatch[0])
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content)
+      console.error('Failed to parse AI response:', responseContent)
       return NextResponse.json({ error: 'Failed to parse receipt analysis' }, { status: 500 })
     }
 
@@ -257,9 +219,9 @@ Return ONLY the JSON object, no other text.`
   } catch (error: any) {
     console.error('Error analyzing receipt:', error)
 
-    if (error.message?.includes('API key') || error.message?.includes('ANTHROPIC')) {
+    if (error.message?.includes('API key') || error.message?.includes('configured')) {
       return NextResponse.json(
-        { error: 'Anthropic API key not configured. Please add ANTHROPIC_API_KEY to your environment variables.' },
+        { error: 'LLM API key not configured. Please add the appropriate API key (ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_AI_API_KEY) to your environment variables.' },
         { status: 500 }
       )
     }

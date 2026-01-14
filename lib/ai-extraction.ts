@@ -1,9 +1,11 @@
 /**
- * AI-powered Email Extraction using Anthropic Claude
+ * AI-powered Email Extraction using LLM Abstraction Layer
  * with Structured Output via Tool Calling
+ * Supports Anthropic, OpenAI, Google via LLM_PROVIDER env var
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { getLLMProvider } from '@/lib/llm'
+import type { Tool } from '@/lib/llm'
 import {
   OrderExtraction,
   validateExtraction,
@@ -111,32 +113,21 @@ Find the TOTAL amount (not subtotals or individual items):
 If you're about to return "gmail", "yahoo", "outlook", etc as merchant_name, STOP and re-read the subject line.`
 
 /**
- * Tool definition for Anthropic structured output
+ * Tool definition for structured output (unified format)
  */
-const EXTRACTION_TOOL: Anthropic.Tool = {
+const EXTRACTION_TOOL: Tool = {
   name: 'extract_order_data',
   description: 'Extract structured purchase information from an order confirmation email',
-  input_schema: {
+  parameters: {
     type: 'object',
     properties: {
       language: {
         type: 'string',
-        enum: ['no', 'en', 'sv', 'da', 'de', 'fr', 'other'],
-        description: 'Detected language of the email'
+        description: 'Detected language: no, en, sv, da, de, fr, or other'
       },
       email_type: {
         type: 'string',
-        enum: [
-          'order_confirmation',
-          'payment_receipt',
-          'shipping_confirmation',
-          'delivery_confirmation',
-          'refund',
-          'invoice',
-          'thank_you',
-          'unknown'
-        ],
-        description: 'Type of email'
+        description: 'Type of email: order_confirmation, payment_receipt, shipping_confirmation, delivery_confirmation, refund, invoice, thank_you, or unknown'
       },
       is_purchase: {
         type: 'boolean',
@@ -148,8 +139,7 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       },
       merchant_category: {
         type: 'string',
-        enum: ['apparel', 'beauty', 'electronics', 'groceries', 'home', 'travel', 'subscriptions', 'entertainment', 'health', 'other'],
-        description: 'Category of the merchant'
+        description: 'Category: apparel, beauty, electronics, groceries, home, travel, subscriptions, entertainment, health, or other'
       },
       merchant_website: {
         type: 'string',
@@ -177,7 +167,6 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       },
       items_list: {
         type: 'array',
-        items: { type: 'string' },
         description: 'List of item names if multiple items'
       },
       items_count: {
@@ -198,17 +187,7 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       },
       confidence: {
         type: 'object',
-        properties: {
-          overall: {
-            type: 'string',
-            enum: ['high', 'medium', 'low']
-          },
-          merchant: { type: 'number' },
-          amount: { type: 'number' },
-          date: { type: 'number' },
-          email_type: { type: 'number' }
-        },
-        required: ['overall', 'merchant', 'amount', 'date', 'email_type']
+        description: 'Confidence levels: overall (high/medium/low), merchant (0-1), amount (0-1), date (0-1), email_type (0-1)'
       },
       extraction_notes: {
         type: 'string',
@@ -232,17 +211,15 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
 }
 
 /**
- * Extracts order data from email using Anthropic Claude
+ * Extracts order data from email using LLM (Anthropic, OpenAI, or Google)
  */
 export async function extractOrderData(
   options: ExtractionOptions
 ): Promise<ExtractionResult> {
   const { emailContent, subject, hasAttachment, attachmentType, maxRetries = 2, merchantHint } = options
 
-  // Initialize Anthropic client
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY
-  })
+  // Get LLM provider (configurable via LLM_PROVIDER env var)
+  const llm = getLLMProvider()
 
   let retries = 0
   let lastError: string | undefined
@@ -284,58 +261,67 @@ ${contextHints}
 
 Use the extract_order_data tool to return structured data.`
 
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929', // Claude 3.5 Sonnet (June 2024) - stable version
-        max_tokens: 4096,
-        tools: [EXTRACTION_TOOL],
-        tool_choice: { type: 'tool', name: 'extract_order_data' },
-        messages: [
-          {
-            role: 'user',
-            content: userPrompt
-          }
-        ],
-        system: SYSTEM_PROMPT
-      })
-
-      // Extract tool use result
-      const toolUse = response.content.find(
-        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+      const response = await llm.chat(
+        [{ role: 'user', content: userPrompt }],
+        {
+          maxTokens: 4096,
+          systemPrompt: SYSTEM_PROMPT,
+          tools: [EXTRACTION_TOOL],
+        }
       )
 
-      if (!toolUse || toolUse.name !== 'extract_order_data') {
-        throw new Error('AI did not return expected tool use')
+      // Extract tool use result
+      let extraction: Record<string, unknown> | null = null
+
+      if (response.toolCalls.length > 0) {
+        const toolCall = response.toolCalls.find(tc => tc.name === 'extract_order_data')
+        if (toolCall) {
+          extraction = toolCall.input
+        }
       }
 
-      const extraction = toolUse.input as any
+      // Fallback: try to parse JSON from text response
+      if (!extraction && response.content) {
+        const jsonMatch = response.content.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          extraction = JSON.parse(jsonMatch[0])
+        }
+      }
+
+      if (!extraction) {
+        throw new Error('AI did not return expected tool use or JSON')
+      }
+
+      // Cast to any for easier property access during post-processing
+      const extractionData = extraction as Record<string, any>
 
       // Post-process: Fix common AI mistakes
 
       // 1. If AI returned email provider as merchant, override with hint
       const emailProviders = ['gmail', 'outlook', 'yahoo', 'hotmail', 'icloud', 'live', 'mail', 'email', 'unknown']
-      const merchantLower = (extraction.merchant_name || '').toLowerCase()
+      const merchantLower = (extractionData.merchant_name || '').toLowerCase()
       if (emailProviders.some(p => merchantLower.includes(p))) {
         if (merchantHint) {
-          console.log(`🔧 Overriding bad merchant "${extraction.merchant_name}" with hint "${merchantHint}"`)
-          extraction.merchant_name = merchantHint
-          extraction.extraction_notes = (extraction.extraction_notes || '') + ` [Auto-corrected merchant from subject line]`
-          extraction.needs_review = true
+          console.log(`🔧 Overriding bad merchant "${extractionData.merchant_name}" with hint "${merchantHint}"`)
+          extractionData.merchant_name = merchantHint
+          extractionData.extraction_notes = (extractionData.extraction_notes || '') + ` [Auto-corrected merchant from subject line]`
+          extractionData.needs_review = true
         }
       }
 
       // 2. Validate and normalize currency
-      if (extraction.total_amount && !extraction.currency && detectedLanguage) {
-        extraction.currency = inferCurrency(detectedLanguage, emailContent)
+      if (extractionData.total_amount && !extractionData.currency && detectedLanguage) {
+        extractionData.currency = inferCurrency(detectedLanguage, emailContent)
       }
 
       // 3. If we still have no good merchant but have a hint, use it
-      if ((!extraction.merchant_name || extraction.merchant_name.length < 2) && merchantHint) {
-        extraction.merchant_name = merchantHint
-        extraction.needs_review = true
+      if ((!extractionData.merchant_name || extractionData.merchant_name.length < 2) && merchantHint) {
+        extractionData.merchant_name = merchantHint
+        extractionData.needs_review = true
       }
 
       // Validate with Zod - NEVER use strict mode (it causes loops)
-      const validation = validateExtraction(extraction, false)
+      const validation = validateExtraction(extractionData, false)
 
       if (!validation.success) {
         lastError = `Validation failed: ${validation.errors?.issues.map(i => i.message).join(', ')}`
@@ -372,16 +358,9 @@ Use the extract_order_data tool to return structured data.`
 }
 
 /**
- * Gets Anthropic API client (with error handling)
+ * Gets LLM provider instance (for backward compatibility)
+ * @deprecated Use getLLMProvider() from '@/lib/llm' directly
  */
-export function getAnthropicClient(): Anthropic {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      'ANTHROPIC_API_KEY not configured in environment variables. Please add it to .env.local'
-    )
-  }
-
-  return new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY
-  })
+export function getLLM() {
+  return getLLMProvider()
 }

@@ -1,9 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { getLLMProvider } from '@/lib/llm'
 import type { CancelStep } from './types'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
 
 export interface SmartCancelResult {
   steps: CancelStep[]
@@ -25,19 +21,14 @@ export interface ServiceLookupResult {
   confidence: 'high' | 'medium' | 'low'
 }
 
-// Search for cancellation info using Claude with web search
+// Search for cancellation info using LLM
 export async function searchCancellationInfo(merchant: string): Promise<SmartCancelResult> {
   const currentYear = new Date().getFullYear()
+  const llm = getLLMProvider()
 
   try {
-    // Use Claude with web search to find current cancellation procedures
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2048,
-      messages: [
-        {
-          role: 'user',
-          content: `Search the web and find the current, up-to-date steps to cancel a ${merchant} subscription in ${currentYear}.
+    // Use LLM to find current cancellation procedures
+    const prompt = `Search the web and find the current, up-to-date steps to cancel a ${merchant} subscription in ${currentYear}.
 
 I need:
 1. The exact URL where users can cancel their subscription (the direct cancellation page, not just the homepage)
@@ -65,15 +56,16 @@ Return your findings as JSON in this exact format:
   "confidence": "high|medium|low"
 }
 
-Only return the JSON, no other text.`,
-        },
-      ],
-    })
+Only return the JSON, no other text.`
 
-    const content = response.content[0]
-    if (content.type === 'text') {
+    const response = await llm.chat(
+      [{ role: 'user', content: prompt }],
+      { maxTokens: 2048 }
+    )
+
+    if (response.content) {
       // Extract JSON from response
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/)
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const data = JSON.parse(jsonMatch[0])
 
@@ -112,16 +104,10 @@ Only return the JSON, no other text.`,
 
 // Quick lookup for cancel URL only (for auto-fill in Add Subscription modal)
 export async function lookupServiceInfo(merchant: string): Promise<ServiceLookupResult> {
-  const currentYear = new Date().getFullYear()
+  const llm = getLLMProvider()
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `Search the web and find the official cancellation/account management URL for ${merchant}.
+    const prompt = `Search the web and find the official cancellation/account management URL for ${merchant}.
 
 Search for "${merchant} cancel subscription" or "${merchant} manage subscription".
 
@@ -134,14 +120,15 @@ Return ONLY a JSON object with these fields:
   "confidence": "high if found official page, medium if general account page, low if guessed"
 }
 
-Only return the JSON, no other text. If you can't find reliable info, set confidence to "low".`,
-        },
-      ],
-    })
+Only return the JSON, no other text. If you can't find reliable info, set confidence to "low".`
 
-    const content = response.content[0]
-    if (content.type === 'text') {
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/)
+    const response = await llm.chat(
+      [{ role: 'user', content: prompt }],
+      { maxTokens: 1024 }
+    )
+
+    if (response.content) {
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const data = JSON.parse(jsonMatch[0])
 

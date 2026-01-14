@@ -1,13 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { getLLMProvider } from '@/lib/llm'
 import type { Case, CaseMessageType, MessageTone, ActionPack } from '@/lib/types'
 
 type RouteContext = { params: Promise<{ id: string }> }
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
 
 // POST /api/cases/[id]/generate-message - Generate an AI message for a case
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -175,25 +171,18 @@ ${messageType === 'escalation' ? 'The escalation should firmly reference consume
 Write the email in Norwegian but keep the JSON keys in English. Follow the tone instruction carefully.`
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2000,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    })
+    const llm = getLLMProvider()
+    const response = await llm.chat(
+      [{ role: 'user', content: prompt }],
+      { maxTokens: 2000 }
+    )
 
-    // Extract text content
-    const textContent = response.content.find((c) => c.type === 'text')
-    if (!textContent || textContent.type !== 'text') {
+    if (!response.content) {
       throw new Error('No text response from AI')
     }
 
     // Parse JSON from response
-    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/)
+    const jsonMatch = response.content.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       throw new Error('No JSON found in AI response')
     }
