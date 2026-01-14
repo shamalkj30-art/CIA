@@ -5,10 +5,36 @@ import { ASSISTANT_TOOLS, executeTool } from '@/lib/assistant-tools'
 import { buildSystemPrompt, generateConversationTitle } from '@/lib/assistant-system-prompt'
 import type { ChatRequest, ToolCallRecord, ChatAttachment } from '@/lib/types'
 
+// Helper to check if attachment is a PDF
+function isPdf(attachment: ChatAttachment): boolean {
+  return attachment.type === 'application/pdf' || attachment.name.toLowerCase().endsWith('.pdf')
+}
+
+// Helper to check if attachment is an image
+function isImage(attachment: ChatAttachment): boolean {
+  return attachment.type.startsWith('image/')
+}
+
+// Extract text from PDF attachment
+async function extractPdfText(attachment: ChatAttachment): Promise<string | null> {
+  if (!isPdf(attachment)) {
+    return null
+  }
+
+  try {
+    const { extractTextFromPdf } = await import('@/lib/pdf-to-image')
+    const buffer = Buffer.from(attachment.data, 'base64')
+    const text = await extractTextFromPdf(buffer.buffer as ArrayBuffer)
+    return text && text.trim().length > 10 ? text : null
+  } catch (error) {
+    console.log('[Assistant] PDF text extraction failed:', error)
+    return null
+  }
+}
+
 // Helper to convert attachment to Claude image content
 function attachmentToImageContent(attachment: ChatAttachment): Anthropic.ImageBlockParam | null {
-  // Check if it's an image type
-  if (!attachment.type.startsWith('image/')) {
+  if (!isImage(attachment)) {
     return null
   }
 
@@ -34,34 +60,75 @@ function attachmentToImageContent(attachment: ChatAttachment): Anthropic.ImageBl
   }
 }
 
-// Build multimodal content from message and attachments
-function buildMessageContent(message: string, attachments?: ChatAttachment[]): Anthropic.ContentBlockParam[] | string {
+// Build multimodal content from message and attachments (async to support PDF extraction)
+async function buildMessageContent(message: string, attachments?: ChatAttachment[]): Promise<Anthropic.ContentBlockParam[] | string> {
   if (!attachments || attachments.length === 0) {
     return message
   }
 
   const content: Anthropic.ContentBlockParam[] = []
+  const pdfTexts: { name: string; text: string }[] = []
+  const processedFiles: string[] = []
+  const unsupportedFiles: string[] = []
 
-  // Add image attachments first
+  // Process all attachments
   for (const attachment of attachments) {
-    const imageContent = attachmentToImageContent(attachment)
-    if (imageContent) {
-      content.push(imageContent)
+    if (isImage(attachment)) {
+      // Add image content for Claude Vision
+      const imageContent = attachmentToImageContent(attachment)
+      if (imageContent) {
+        content.push(imageContent)
+        processedFiles.push(`${attachment.name} (image)`)
+      }
+    } else if (isPdf(attachment)) {
+      // Extract text from PDF
+      const pdfText = await extractPdfText(attachment)
+      if (pdfText) {
+        pdfTexts.push({ name: attachment.name, text: pdfText })
+        processedFiles.push(`${attachment.name} (PDF - text extracted)`)
+      } else {
+        unsupportedFiles.push(`${attachment.name} (PDF - could not extract text, may be image-based)`)
+      }
+    } else {
+      // Unsupported file type
+      unsupportedFiles.push(`${attachment.name} (${attachment.type} - not supported)`)
     }
   }
 
-  // Add the text message
-  if (message.trim()) {
+  // Build the text message with context about attached files
+  let textContent = message.trim()
+
+  // Add PDF text content
+  if (pdfTexts.length > 0) {
+    textContent += '\n\n--- ATTACHED PDF CONTENT ---'
+    for (const pdf of pdfTexts) {
+      textContent += `\n\n[Content from ${pdf.name}]:\n${pdf.text}`
+    }
+    textContent += '\n--- END PDF CONTENT ---'
+  }
+
+  // Add info about unsupported files
+  if (unsupportedFiles.length > 0) {
+    textContent += `\n\n[Note: The following files could not be processed: ${unsupportedFiles.join(', ')}]`
+  }
+
+  // Add the text content
+  if (textContent.trim()) {
     content.push({
       type: 'text',
-      text: message,
+      text: textContent,
     })
-  } else {
-    // Default message when only files are attached
+  } else if (content.length === 0) {
+    // No images and no text - shouldn't happen but handle gracefully
     content.push({
       type: 'text',
       text: 'Please analyze the attached file(s) and extract any relevant information.',
     })
+  }
+
+  console.log(`[Assistant] Processed files: ${processedFiles.join(', ') || 'none'}`)
+  if (unsupportedFiles.length > 0) {
+    console.log(`[Assistant] Unsupported files: ${unsupportedFiles.join(', ')}`)
   }
 
   return content
@@ -161,6 +228,7 @@ export async function POST(request: NextRequest) {
           })
 
           // Build messages array for Claude
+          const messageContent = await buildMessageContent(message || '', attachments)
           const messages: Anthropic.MessageParam[] = [
             ...(history || []).map(m => ({
               role: m.role as 'user' | 'assistant',
@@ -168,7 +236,7 @@ export async function POST(request: NextRequest) {
             })),
             {
               role: 'user',
-              content: buildMessageContent(message || '', attachments),
+              content: messageContent,
             },
           ]
 
