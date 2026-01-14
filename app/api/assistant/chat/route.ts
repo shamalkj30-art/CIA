@@ -1,9 +1,18 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { SupabaseClient } from '@supabase/supabase-js'
 import { ASSISTANT_TOOLS, executeTool } from '@/lib/assistant-tools'
 import { buildSystemPrompt, generateConversationTitle } from '@/lib/assistant-system-prompt'
 import type { ChatRequest, ToolCallRecord, ChatAttachment } from '@/lib/types'
+
+// Uploaded file metadata type
+interface UploadedFileMetadata {
+  storage_path: string
+  file_name: string
+  file_type: string
+  file_size: number
+}
 
 // Helper to check if attachment is a PDF
 function isPdf(attachment: ChatAttachment): boolean {
@@ -13,6 +22,63 @@ function isPdf(attachment: ChatAttachment): boolean {
 // Helper to check if attachment is an image
 function isImage(attachment: ChatAttachment): boolean {
   return attachment.type.startsWith('image/')
+}
+
+// Upload attachment to Supabase storage
+async function uploadAttachmentToStorage(
+  supabase: SupabaseClient,
+  userId: string,
+  attachment: ChatAttachment
+): Promise<UploadedFileMetadata | null> {
+  try {
+    const timestamp = Date.now()
+    const sanitizedName = attachment.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const storagePath = `${userId}/${timestamp}_${sanitizedName}`
+
+    // Convert base64 to buffer
+    const buffer = Buffer.from(attachment.data, 'base64')
+
+    // Determine content type
+    let contentType = attachment.type
+    const fileName = attachment.name.toLowerCase()
+
+    if (!contentType || contentType === 'application/octet-stream') {
+      if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+        contentType = 'image/jpeg'
+      } else if (fileName.endsWith('.png')) {
+        contentType = 'image/png'
+      } else if (fileName.endsWith('.pdf')) {
+        contentType = 'application/pdf'
+      } else if (fileName.endsWith('.webp')) {
+        contentType = 'image/webp'
+      }
+    }
+
+    // Upload to storage
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(storagePath, buffer, {
+        contentType: contentType || 'application/octet-stream',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error('[Assistant] Storage upload error:', uploadError)
+      return null
+    }
+
+    console.log(`[Assistant] Uploaded file to storage: ${storagePath}`)
+
+    return {
+      storage_path: storagePath,
+      file_name: attachment.name,
+      file_type: attachment.type || contentType,
+      file_size: attachment.size,
+    }
+  } catch (error) {
+    console.error('[Assistant] Failed to upload attachment:', error)
+    return null
+  }
 }
 
 // Extract text from PDF attachment
@@ -60,19 +126,39 @@ function attachmentToImageContent(attachment: ChatAttachment): Anthropic.ImageBl
   }
 }
 
+// Result of building message content
+interface MessageBuildResult {
+  content: Anthropic.ContentBlockParam[] | string
+  uploadedFiles: UploadedFileMetadata[]
+}
+
 // Build multimodal content from message and attachments (async to support PDF extraction)
-async function buildMessageContent(message: string, attachments?: ChatAttachment[]): Promise<Anthropic.ContentBlockParam[] | string> {
+async function buildMessageContent(
+  message: string,
+  attachments: ChatAttachment[] | undefined,
+  supabase: SupabaseClient,
+  userId: string
+): Promise<MessageBuildResult> {
   if (!attachments || attachments.length === 0) {
-    return message
+    return { content: message, uploadedFiles: [] }
   }
 
   const content: Anthropic.ContentBlockParam[] = []
   const pdfTexts: { name: string; text: string }[] = []
   const processedFiles: string[] = []
   const unsupportedFiles: string[] = []
+  const uploadedFiles: UploadedFileMetadata[] = []
 
   // Process all attachments
   for (const attachment of attachments) {
+    // Upload file to storage first (for all valid file types)
+    if (isImage(attachment) || isPdf(attachment)) {
+      const uploadResult = await uploadAttachmentToStorage(supabase, userId, attachment)
+      if (uploadResult) {
+        uploadedFiles.push(uploadResult)
+      }
+    }
+
     if (isImage(attachment)) {
       // Add image content for Claude Vision
       const imageContent = attachmentToImageContent(attachment)
@@ -107,6 +193,17 @@ async function buildMessageContent(message: string, attachments?: ChatAttachment
     textContent += '\n--- END PDF CONTENT ---'
   }
 
+  // Add info about uploaded files (so Claude can reference them for document attachment)
+  if (uploadedFiles.length > 0) {
+    textContent += '\n\n--- UPLOADED FILE INFO (for document attachment) ---'
+    textContent += '\nThese files have been uploaded and can be attached to purchases:'
+    for (const file of uploadedFiles) {
+      textContent += `\n- ${file.file_name}: storage_path="${file.storage_path}", file_type="${file.file_type}", file_size=${file.file_size}`
+    }
+    textContent += '\n\nWhen creating a purchase, include the document info to attach the receipt.'
+    textContent += '\n--- END UPLOADED FILE INFO ---'
+  }
+
   // Add info about unsupported files
   if (unsupportedFiles.length > 0) {
     textContent += `\n\n[Note: The following files could not be processed: ${unsupportedFiles.join(', ')}]`
@@ -127,11 +224,12 @@ async function buildMessageContent(message: string, attachments?: ChatAttachment
   }
 
   console.log(`[Assistant] Processed files: ${processedFiles.join(', ') || 'none'}`)
+  console.log(`[Assistant] Uploaded files: ${uploadedFiles.length}`)
   if (unsupportedFiles.length > 0) {
     console.log(`[Assistant] Unsupported files: ${unsupportedFiles.join(', ')}`)
   }
 
-  return content
+  return { content, uploadedFiles }
 }
 
 export const runtime = 'nodejs'
@@ -227,8 +325,13 @@ export async function POST(request: NextRequest) {
             content: message,
           })
 
-          // Build messages array for Claude
-          const messageContent = await buildMessageContent(message || '', attachments)
+          // Build messages array for Claude (including file upload)
+          const { content: messageContent, uploadedFiles } = await buildMessageContent(
+            message || '',
+            attachments,
+            supabase,
+            user.id
+          )
           const messages: Anthropic.MessageParam[] = [
             ...(history || []).map(m => ({
               role: m.role as 'user' | 'assistant',

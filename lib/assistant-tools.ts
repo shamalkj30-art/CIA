@@ -65,7 +65,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_purchase',
-    description: 'Create a new purchase record. Use when user wants to add a purchase.',
+    description: 'Create a new purchase record. Use when user wants to add a purchase. If a receipt file was uploaded, include the document info to attach it.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -76,6 +76,17 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
         warranty_months: { type: 'number', description: 'Warranty duration in months' },
         category: { type: 'string', description: 'Category (e.g., electronics, clothing)' },
         notes: { type: 'string', description: 'Additional notes' },
+        document: {
+          type: 'object',
+          description: 'Receipt document to attach (from uploaded file info)',
+          properties: {
+            storage_path: { type: 'string', description: 'Storage path from uploaded file' },
+            file_name: { type: 'string', description: 'Original file name' },
+            file_type: { type: 'string', description: 'MIME type of the file' },
+            file_size: { type: 'number', description: 'File size in bytes' },
+          },
+          required: ['storage_path', 'file_name', 'file_type', 'file_size'],
+        },
       },
       required: ['item_name', 'purchase_date'],
     },
@@ -439,6 +450,14 @@ async function getPurchase(
   return data
 }
 
+// Document metadata for attaching receipts
+interface DocumentMetadata {
+  storage_path: string
+  file_name: string
+  file_type: string
+  file_size: number
+}
+
 async function createPurchase(
   supabase: SupabaseClient,
   userId: string,
@@ -453,7 +472,7 @@ async function createPurchase(
     warranty_months: input.warranty_months || 0,
     category: input.category || null,
     notes: input.notes || null,
-    source: 'manual' as const,
+    source: 'assistant' as const,
     auto_detected: false,
     needs_review: false,
   }
@@ -465,14 +484,38 @@ async function createPurchase(
     ;(purchaseData as Record<string, unknown>).warranty_expires_at = purchaseDate.toISOString().split('T')[0]
   }
 
-  const { data, error } = await supabase
+  // Insert purchase
+  const { data: purchase, error: purchaseError } = await supabase
     .from('purchases')
     .insert(purchaseData)
     .select()
     .single()
 
-  if (error) throw error
-  return data
+  if (purchaseError) throw purchaseError
+
+  // If document info was provided, create document record
+  const documentInput = input.document as DocumentMetadata | undefined
+  if (documentInput && documentInput.storage_path) {
+    const { error: docError } = await supabase
+      .from('documents')
+      .insert({
+        purchase_id: purchase.id,
+        user_id: userId,
+        storage_path: documentInput.storage_path,
+        file_name: documentInput.file_name,
+        file_type: documentInput.file_type,
+        file_size: documentInput.file_size,
+      })
+
+    if (docError) {
+      console.error('[Assistant] Failed to create document record:', docError)
+      // Don't fail the whole operation, just log the error
+    } else {
+      console.log('[Assistant] Document attached to purchase:', documentInput.file_name)
+    }
+  }
+
+  return purchase
 }
 
 async function updatePurchase(
