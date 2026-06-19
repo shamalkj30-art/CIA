@@ -24,6 +24,8 @@
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-query": "^5.90.16",
     "@tanstack/react-table": "^8.21.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.40.0",
     "googleapis": "^169.0.0",
     "jspdf": "^3.0.4",
     "jszip": "^3.10.1",
@@ -36,6 +38,7 @@
     "react-hook-form": "^7.70.0",
     "recharts": "^3.6.0",
     "resend": "^6.6.0",
+    "tailwind-merge": "^3.6.0",
     "unpdf": "^1.4.0",
     "zod": "^4.3.5"
   },
